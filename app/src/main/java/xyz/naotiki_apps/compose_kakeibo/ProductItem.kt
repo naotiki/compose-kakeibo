@@ -1,0 +1,223 @@
+package xyz.naotiki_apps.compose_kakeibo
+
+import android.content.Context
+import androidx.annotation.ColorInt
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.dp
+import androidx.room.*
+import androidx.sqlite.db.SupportSQLiteDatabase
+import kotlinx.coroutines.flow.Flow
+import xyz.naotiki_apps.compose_kakeibo.Category.Companion.sortById
+import xyz.naotiki_apps.compose_kakeibo.ColorData.Companion.toColorData
+
+@Entity(
+    tableName = "product_item", foreignKeys = [ForeignKey(onDelete =ForeignKey.SET_NULL,
+        entity = Category::class,
+        parentColumns = arrayOf("category_id"),
+        childColumns = arrayOf("parent_category_id")
+    )], indices = [Index("parent_category_id")]
+)
+data class ProductItem(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val name: String,
+    val date: Date,
+    val price: Int,
+    @ColumnInfo(name = "parent_category_id") val categoryId: Int?,/*?*/
+    val memo: String?,
+)
+
+
+
+@Entity(
+    tableName = "category", indices = [Index(
+        value = ["category_name", "parentId"], unique = true
+    )]
+)
+data class Category(
+    @PrimaryKey(autoGenerate = true) @ColumnInfo(name = "category_id") var id: Int = 0,
+
+    @ColumnInfo(name = "category_name") var name: String,
+    var parentId: Int? = null,
+
+     var color: ColorData? = null,
+    //var iconText: IconText?=null
+
+
+) {
+    /*fun getColor(): androidx.compose.ui.graphicsColor? {
+
+        return color?.let { Color(it) }
+    }*/
+
+    fun addChildren(vararg child: Category): Array<Category> =
+        if (this.id != 0 && parentId == null) {
+            arrayOf(this, *child.map {
+                it.parentId = this.id
+                it
+            }.toTypedArray())
+        } else {
+            throw IllegalArgumentException()
+        }
+
+
+    companion object {
+        /**
+         * 一気に追加するときにidが指定されているものが先にくるようにする
+         * 0は最後にー
+         * */
+        private val comparator = Comparator<Category> { o1, o2 ->
+            if (o1.id == 0) {
+                1
+            } else if (o2.id == 0) {
+                -1
+            } else {
+                o1.id.compareTo(o2.id)
+            }
+        }
+        fun Array<out Category>.sortById(): Array<Category> = this.sortedWith(comparator).toTypedArray()
+
+    }
+}
+
+
+data class CategoryAndProductItem(
+    @Embedded val category: Category,
+    @Relation(parentColumn = "category_id", entityColumn = "parent_category_id") val productItems: List<ProductItem>
+)
+
+
+@Dao
+abstract class ProductItemDao {
+
+    @Query("SELECT * FROM product_item WHERE date = :date")
+    abstract fun getItemsFromDate(date: Date): List<ProductItem>
+
+    @Query("SELECT * FROM product_item  WHERE :minDate <= date AND :maxDate >= date")
+    protected abstract fun _getItemsRangeDate(minDate: Date, maxDate: Date): List<ProductItem>
+
+    @Insert
+    abstract fun insertAll(vararg users: ProductItem)
+
+    @Delete
+    abstract fun delete(user: ProductItem)
+
+    @Transaction
+    open fun getItemsRangeDate(range: DateRange): List<ProductItem> = _getItemsRangeDate(range.minDate, range.maxDate)
+
+
+}
+
+@Dao
+interface CategoryDao {
+    /**
+     * よいこのみんなは[PrimaryKey.autoGenerate]による重複を防ぐため [sortById]を使ってから入れようね！！
+     * */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    fun insertAll(vararg categories: Category)
+
+    @Delete
+    fun delete(category: Category)
+
+    @Query("SELECT * FROM category")
+    fun getAllCategory(): Flow<List<Category>>
+
+    @Query("SELECT * FROM category WHERE category_id = :parentId")
+    fun getCategoryFromParent(parentId: Int): List<Category>
+
+    @Transaction
+    @Query("SELECT * FROM category WHERE category_id IN (:categoryIds)")
+    fun getCategoryByIds(vararg categoryIds: Int): List<CategoryAndProductItem>
+
+    /*@Transaction
+      @Query("SELECT * FROM Category")
+      abstract fun getCategoryAndProductItemList(): Array<CategoryAndProductItem>*/
+
+}
+
+
+@Database(
+    entities = [ProductItem::class, Category::class],
+    version = 1,
+    exportSchema = true,
+    // autoMigrations = [AutoMigration(from = 2, to = 3)]
+)
+@TypeConverters(Converters::class)
+
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun productItemDao(): ProductItemDao
+    abstract fun categoryDao(): CategoryDao
+
+
+    companion object {
+
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
+
+        fun getInstance(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
+            INSTANCE ?: buildDatabase(context).also { INSTANCE = it }
+        }
+
+
+        private fun buildDatabase(context: Context) =
+            Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "app_database")
+                .addCallback(object : Callback() {
+
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        super.onCreate(db)
+
+                        ioThread{
+
+                            getInstance(context).categoryDao().insertAll(*DEFAULT_CATEGORIES)
+                        }
+                    }
+                }).build()
+
+
+        val DEFAULT_CATEGORIES = arrayOf(
+            *Category(id = 1, name = "食品", color = Color.Red.toColorData()).addChildren(
+                Category(name = "野菜", color = null),
+                Category(name = "肉、魚", color = null),
+                Category(name = "主食", color = null),
+                Category(name = "嗜好品、果物", color = null),
+                Category(name = "惣菜、カップ麺等", color = null),
+                Category(name = "調味料、その他", color = null)
+            ),
+            Category(id = 2, name = "日用品", color = Color.Blue.toColorData()),
+            Category(id = 3, name = "その他", color = Color.Gray.toColorData()),
+        ).sortById()
+    }
+}
+
+data class ColorData (@ColorInt var colorInt: Int){
+    fun toColor(): Color {
+        return Color(colorInt)
+    }
+    companion object{
+        fun Color.toColorData()=ColorData(this.toArgb())
+
+    }
+}
+
+
+class Converters {
+    @TypeConverter
+    fun toDate(value: Int): Date {
+        Color.Red.toColorData()
+        return Date.fromInt(value)
+    }
+    @TypeConverter
+    fun dateToInt(date: Date): Int {
+        return date.toInt()
+    }
+
+    @TypeConverter
+    fun toColorData(value: Int?):ColorData?{
+        return value?.let { ColorData(it) }
+    }
+
+    @TypeConverter
+    fun colorDataToInt(color: ColorData?):Int?{
+        return color?.colorInt
+    }
+}
