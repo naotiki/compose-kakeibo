@@ -1,6 +1,5 @@
 package xyz.naotiki_apps.compose_kakeibo
 
-import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -19,7 +18,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-//あああ
+
 enum class Direction(val value: Int) {
     Previous(-1),
     Next(1)
@@ -29,7 +28,6 @@ class LoopPagerState {
     var hasOrder by mutableStateOf(false)
     var orderDirection: Direction? by mutableStateOf(null)
     fun animateTo(direction: Direction) {
-
         hasOrder = true
         orderDirection = direction
     }
@@ -37,6 +35,12 @@ class LoopPagerState {
 
 @Composable
 fun rememberLoopPagerState() = remember { LoopPagerState() }
+
+/**
+ * LoopPagerは横方向の表示をループします。*/
+/* これ作るのじかんかかった
+ * すごくね？
+ * RecyclerView使ったら簡単にできた説・・・*/
 
 @Composable
 fun LoopPager(
@@ -47,9 +51,6 @@ fun LoopPager(
     next: @Composable () -> Unit,
     threshold: Float = 150F,
 ) {
-
-    Log.i("TAG", "LoopPager:${state.hasOrder}")
-    Log.i("TAG", "LoopPager:${state.orderDirection}")
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val sizePx = with(LocalDensity.current) { screenWidth.toPx() }
     val coroutineScope = rememberCoroutineScope()
@@ -61,14 +62,11 @@ fun LoopPager(
     val animatableForState = remember(state.hasOrder) { Animatable(0F) }
     if ((offsetX.value >= sizePx) && onDragging && !animatable.isRunning) {
         onChanged(Direction.Previous)
-
         offsetX.value = 0F
     } else if ((offsetX.value <= -sizePx) && onDragging && !animatable.isRunning) {
         onChanged(Direction.Next)
-
         offsetX.value = 0F
     }
-
     val float = if (abs(offsetX.value) > threshold && offsetX.value != 0F && (!onDragging || animatable.isRunning)) {
         if (!animatable.isRunning) {
             coroutineScope.launch {
@@ -81,16 +79,11 @@ fun LoopPager(
                     )
                     onChanged(direction)
                     offsetX.value = 0F
-
                 }
             }
         }
-
-        remember {
-            animatable.asState()
-        }
+        remember { animatable.asState() }
     } else if (state.hasOrder && (!onDragging || animatableForState.isRunning)) {
-        Log.i("TAG", "LoopPager: PROGRAM OUTSIDE")
         if (!animatableForState.isRunning) {
             coroutineScope.launch {
                 if (!animatableForState.isRunning) {
@@ -106,37 +99,20 @@ fun LoopPager(
                 }
             }
         }
-
-        remember {
-            animatableForState.asState()
-        }
+        remember { animatableForState.asState() }
     } else if (abs(offsetX.value) <= threshold && offsetX.value != 0F && (!onDragging || animatable.isRunning)) {
         if (!animatable.isRunning) {
-
             coroutineScope.launch {
-
-                animatable.animateTo(
-                    0F,
-                    animationSpec = tween(250, easing = LinearEasing)
-                )
+                animatable.animateTo(0F, animationSpec = tween(250, easing = LinearEasing))
                 offsetX.value = 0F
             }
         }
-        remember {
-            animatable.asState()
-        }
+        remember { animatable.asState() }
     } else {
         state.hasOrder = false
         state.orderDirection = null
-
         offsetX
     }
-
-
-
-    Log.i("floatAnim", "LoopPager: $float")
-
-
     Row(Modifier.requiredWidth(screenWidth * 3).pointerInput(Unit) {
         detectHorizontalDragGestures(onDragStart = {
             onDragging = true
@@ -152,7 +128,5 @@ fun LoopPager(
         current()
         next()
     }
-
-
 }
 

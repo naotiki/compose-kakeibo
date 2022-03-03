@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.annotation.ColorInt
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.unit.dp
 import androidx.room.*
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
@@ -12,13 +11,13 @@ import xyz.naotiki_apps.compose_kakeibo.Category.Companion.sortById
 import xyz.naotiki_apps.compose_kakeibo.ColorData.Companion.toColorData
 
 @Entity(
-    tableName = "product_item", foreignKeys = [ForeignKey(onDelete =ForeignKey.SET_NULL,
+    tableName = "item_data", foreignKeys = [ForeignKey(onDelete =ForeignKey.SET_NULL,
         entity = Category::class,
         parentColumns = arrayOf("category_id"),
         childColumns = arrayOf("parent_category_id")
     )], indices = [Index("parent_category_id")]
 )
-data class ProductItem(
+data class ItemData(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,
     val date: Date,
@@ -62,10 +61,7 @@ data class Category(
 
 
     companion object {
-        /**
-         * 一気に追加するときにidが指定されているものが先にくるようにする
-         * 0は最後にー
-         * */
+
         private val comparator = Comparator<Category> { o1, o2 ->
             if (o1.id == 0) {
                 1
@@ -75,6 +71,10 @@ data class Category(
                 o1.id.compareTo(o2.id)
             }
         }
+        /**
+         * 一気に追加するときにidが指定されているものが先にくるようにする
+         *0は最後にー
+         * */
         fun Array<out Category>.sortById(): Array<Category> = this.sortedWith(comparator).toTypedArray()
 
     }
@@ -83,28 +83,34 @@ data class Category(
 
 data class CategoryAndProductItem(
     @Embedded val category: Category,
-    @Relation(parentColumn = "category_id", entityColumn = "parent_category_id") val productItems: List<ProductItem>
+    @Relation(parentColumn = "category_id", entityColumn = "parent_category_id") val itemDatas: List<ItemData>
 )
 
 
+data class DateAndPriceProductItem(
+    val date: Date,
+    val price: Int,
+)
 @Dao
-abstract class ProductItemDao {
+abstract class ItemDataDao {
 
-    @Query("SELECT * FROM product_item WHERE date = :date")
-    abstract fun getItemsFromDate(date: Date): List<ProductItem>
+    @Query("SELECT * FROM item_data WHERE date = :date")
+    abstract fun getItemsFromDate(date: Date): List<ItemData>
 
-    @Query("SELECT * FROM product_item  WHERE :minDate <= date AND :maxDate >= date")
-    protected abstract fun _getItemsRangeDate(minDate: Date, maxDate: Date): List<ProductItem>
+    @Query("SELECT * FROM item_data  WHERE :minDate <= date AND :maxDate >= date")
+    protected abstract fun _getItemsRangeDate(minDate: Date, maxDate: Date): List<ItemData>
 
     @Insert
-    abstract fun insertAll(vararg users: ProductItem)
+    abstract fun insertAll(vararg users: ItemData)
 
     @Delete
-    abstract fun delete(user: ProductItem)
+    abstract fun delete(user: ItemData)
 
     @Transaction
-    open fun getItemsRangeDate(range: DateRange): List<ProductItem> = _getItemsRangeDate(range.minDate, range.maxDate)
+    open fun getItemsRangeDate(range: DateRange): List<ItemData> = _getItemsRangeDate(range.minDate, range.maxDate)
 
+    @Query("SELECT price,date from item_data  WHERE :minDate <= date AND :maxDate >= date")
+   abstract fun getDateRangeSummary(minDate: Date, maxDate: Date):List<DateAndPriceProductItem>
 
 }
 
@@ -137,7 +143,7 @@ interface CategoryDao {
 
 
 @Database(
-    entities = [ProductItem::class, Category::class],
+    entities = [ItemData::class, Category::class],
     version = 1,
     exportSchema = true,
     // autoMigrations = [AutoMigration(from = 2, to = 3)]
@@ -145,7 +151,7 @@ interface CategoryDao {
 @TypeConverters(Converters::class)
 
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun productItemDao(): ProductItemDao
+    abstract fun productItemDao(): ItemDataDao
     abstract fun categoryDao(): CategoryDao
 
 
@@ -204,7 +210,7 @@ class Converters {
     @TypeConverter
     fun toDate(value: Int): Date {
         Color.Red.toColorData()
-        return Date.fromInt(value)
+        return Date.dateFromInt(value)
     }
     @TypeConverter
     fun dateToInt(date: Date): Int {

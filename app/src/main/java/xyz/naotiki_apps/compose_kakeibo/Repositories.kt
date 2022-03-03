@@ -11,3 +11,9 @@ class CategoryRepository(private val categoryDao: CategoryDao) {
         }
     }
 }
+
+class ProductItemRepository(private val itemDataDao: ItemDataDao) {
+   fun getDaySummary(dateRange: DateRange)=
+        itemDataDao.getDateRangeSummary(dateRange.minDate,dateRange.maxDate)
+
+}

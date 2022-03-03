@@ -1,10 +1,10 @@
+@file:Suppress("RemoveRedundantBackticks", "NonAsciiCharacters")
+
 package xyz.naotiki_apps.compose_kakeibo
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import org.junit.Assert
 import org.junit.Test
-import xyz.naotiki_apps.compose_kakeibo.CalendarUtil.DayOfWeek
 import xyz.naotiki_apps.compose_kakeibo.Category.Companion.sortById
 import xyz.naotiki_apps.compose_kakeibo.ColorData.Companion.toColorData
 
@@ -45,7 +45,7 @@ class ExampleUnitTest {
             for (v in 1..dayCount){
                 date.day=v
                 println(date.toString())
-                Assert.assertEquals(date,Date.fromInt(date.toInt()))
+                Assert.assertEquals(date,Date.dateFromInt(date.toInt()))
 
             }
             date=date.shiftMonth(Direction.Next)
