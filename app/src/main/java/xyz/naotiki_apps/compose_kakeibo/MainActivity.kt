@@ -192,7 +192,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     // CategoriesList()
-                    val scope = rememberCoroutineScope()
+                   /* val scope = rememberCoroutineScope()
                     val sheetScrollState = rememberScrollState()
 
                     val scaffoldState = rememberBottomSheetScaffoldState()
@@ -288,7 +288,7 @@ class MainActivity : ComponentActivity() {
                          }, sheetPeekHeight = 100.dp
                      ) {
 
-                     }*/
+                     }*/*/
                 }
             }
         }
