@@ -11,7 +11,7 @@ import xyz.naotiki_apps.compose_kakeibo.Category.Companion.sortById
 import xyz.naotiki_apps.compose_kakeibo.ColorData.Companion.toColorData
 
 @Entity(
-    tableName = "item_data", foreignKeys = [ForeignKey(onDelete =ForeignKey.SET_NULL,
+    tableName = "item_data", foreignKeys = [ForeignKey(onDelete =ForeignKey.SET_DEFAULT,
         entity = Category::class,
         parentColumns = arrayOf("category_id"),
         childColumns = arrayOf("parent_category_id")
@@ -22,8 +22,8 @@ data class ItemData(
     val name: String,
     val date: Date,
     val price: Int,
-    @ColumnInfo(name = "parent_category_id") val categoryId: Int?,/*?*/
-    val memo: String?,
+    @ColumnInfo(name = "parent_category_id", defaultValue = "1") val categoryId: Int,
+    val memo: String?=null,
 )
 
 
@@ -94,11 +94,12 @@ data class DateAndPriceProductItem(
 @Dao
 abstract class ItemDataDao {
 
+    @Query("SELECT date FROM item_data  WHERE :minDate <= date AND :maxDate >= date")
+     abstract fun getHasDataDaysFromDateRange(minDate: Date, maxDate: Date): Flow<List<Date>>
+
     @Query("SELECT * FROM item_data WHERE date = :date")
     abstract fun getItemsFromDate(date: Date): List<ItemData>
 
-    @Query("SELECT * FROM item_data  WHERE :minDate <= date AND :maxDate >= date")
-    protected abstract fun _getItemsRangeDate(minDate: Date, maxDate: Date): List<ItemData>
 
     @Insert
     abstract fun insertAll(vararg users: ItemData)
@@ -106,11 +107,10 @@ abstract class ItemDataDao {
     @Delete
     abstract fun delete(user: ItemData)
 
-    @Transaction
-    open fun getItemsRangeDate(range: DateRange): List<ItemData> = _getItemsRangeDate(range.minDate, range.maxDate)
 
-    @Query("SELECT price,date from item_data  WHERE :minDate <= date AND :maxDate >= date")
-   abstract fun getDateRangeSummary(minDate: Date, maxDate: Date):List<DateAndPriceProductItem>
+    @Query("SELECT date,price from item_data  WHERE :minDate <= date AND :maxDate >= date")
+    abstract fun getDateRangeSummary(minDate: Date, maxDate: Date):Flow<List<DateAndPriceProductItem>>
+
 
 }
 
@@ -149,9 +149,8 @@ interface CategoryDao {
     // autoMigrations = [AutoMigration(from = 2, to = 3)]
 )
 @TypeConverters(Converters::class)
-
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun productItemDao(): ItemDataDao
+    abstract fun itemDataDao(): ItemDataDao
     abstract fun categoryDao(): CategoryDao
 
 
@@ -181,7 +180,8 @@ abstract class AppDatabase : RoomDatabase() {
 
 
         val DEFAULT_CATEGORIES = arrayOf(
-            *Category(id = 1, name = "食品", color = Color.Red.toColorData()).addChildren(
+            Category(id=1, name = "未設定"),
+            *Category(id = 2, name = "食品", color = Color.Red.toColorData()).addChildren(
                 Category(name = "野菜", color = null),
                 Category(name = "肉、魚", color = null),
                 Category(name = "主食", color = null),
@@ -189,8 +189,8 @@ abstract class AppDatabase : RoomDatabase() {
                 Category(name = "惣菜、カップ麺等", color = null),
                 Category(name = "調味料、その他", color = null)
             ),
-            Category(id = 2, name = "日用品", color = Color.Blue.toColorData()),
-            Category(id = 3, name = "その他", color = Color.Gray.toColorData()),
+            Category(id = 3, name = "日用品", color = Color.Blue.toColorData()),
+            Category(id = 4, name = "その他", color = Color.Gray.toColorData()),
         ).sortById()
     }
 }
@@ -206,24 +206,3 @@ data class ColorData (@ColorInt var colorInt: Int){
 }
 
 
-class Converters {
-    @TypeConverter
-    fun toDate(value: Int): Date {
-        Color.Red.toColorData()
-        return Date.dateFromInt(value)
-    }
-    @TypeConverter
-    fun dateToInt(date: Date): Int {
-        return date.toInt()
-    }
-
-    @TypeConverter
-    fun toColorData(value: Int?):ColorData?{
-        return value?.let { ColorData(it) }
-    }
-
-    @TypeConverter
-    fun colorDataToInt(color: ColorData?):Int?{
-        return color?.colorInt
-    }
-}

@@ -1,67 +1,81 @@
 package xyz.naotiki_apps.compose_kakeibo
 
+
 import android.os.Bundle
-import android.util.Log
-import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.LiveData
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.activity
+import androidx.lifecycle.asLiveData
+import androidx.lifecycle.distinctUntilChanged
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import kotlinx.coroutines.flow.MutableStateFlow
+import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
-import xyz.naotiki_apps.compose_kakeibo.CalendarUtil.DayOfWeek
 import xyz.naotiki_apps.compose_kakeibo.DateRange.Companion.asOneDayDateRange
 import xyz.naotiki_apps.compose_kakeibo.DateStringFormatter.FormatType
+import xyz.naotiki_apps.compose_kakeibo.KakeiboScreen.Companion.NAVIGATE_TO_BACK
+import xyz.naotiki_apps.compose_kakeibo.KakeiboScreen.Companion.buildGraph
 import xyz.naotiki_apps.compose_kakeibo.ui.theme.Compose_kakeiboTheme
+import javax.inject.Inject
+import kotlin.collections.List
+import kotlin.collections.Map
+import kotlin.collections.associateWith
+import kotlin.collections.component1
+import kotlin.collections.component2
+import kotlin.collections.filter
+import kotlin.collections.forEach
+import kotlin.collections.ifEmpty
+import kotlin.collections.map
+import kotlin.collections.set
 
 //一文字だけ
 data class IconText(var iconText: String) {
     init {
         iconText = iconText.firstLetter()
     }
-
 }
 
-class MainViewModel(
-    appDatabase: AppDatabase
+//これSummaryVMでいいんじゃね？？
+@HiltViewModel
+class MainViewModel @Inject constructor(
+    categoryRepository: CategoryRepository,
+    private val itemDataRepository: ItemDataRepository
 ) : ViewModel() {
 
-    private val categoryRepository: CategoryRepository = CategoryRepository(appDatabase.categoryDao())
-    private val productItemRepository: ProductItemRepository = ProductItemRepository(appDatabase.productItemDao())
     var allCategories = categoryRepository.getAllCategories().distinctUntilChanged()
 
-    var summary = MutableStateFlow<List<DateAndPriceProductItem>?>(null)
+    var summary: LiveData<List<DateAndPriceProductItem>>? = null
 
 
     fun getSummary(date: Date, isMonth: Boolean = false) {
+        summary =
+            itemDataRepository.getDaySummary(if (isMonth) DateRange(date) else date.asOneDayDateRange())
+                .distinctUntilChanged().asLiveData()
+    }
 
-        ioThread {
-            summary.value =
-                productItemRepository.getDaySummary(if (isMonth) DateRange(date) else date.asOneDayDateRange())
-        }
+    var events: LiveData<List<Date>>? = null
+    fun getHasDataDays(dateRange: DateRange) {
+        events = itemDataRepository.getHasDataDay(dateRange).asLiveData().distinctUntilChanged()
     }
 
     fun getAllCategoriesWithChildren(categories: List<Category>): Map<Category, List<Category>?> {
@@ -71,7 +85,6 @@ class MainViewModel(
         val children = categories.filter {
             it.parentId != null
         }
-
         return parents.associateWith {
             children.filter { child ->
                 child.parentId == it.id
@@ -81,10 +94,8 @@ class MainViewModel(
 
 }
 
-class MainActivity : ComponentActivity() {
-    //lateinit var appDatabase: AppDatabase
-
-
+@AndroidEntryPoint
+class MainActivity : AppCompatActivity() {
     @Composable
     fun CategoriesList() {
         val allCategory by mainViewModel.allCategories.collectAsState(null)
@@ -103,8 +114,7 @@ class MainActivity : ComponentActivity() {
                     Row(Modifier.fillMaxWidth()) {
                         if (hasChildren) {
                             IconButton(
-                                onClick = { expanded[parent] = !isExpanded },
-                                enabled = hasChildren
+                                onClick = { expanded[parent] = !isExpanded }
                             ) {
                                 Icon(
                                     if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -117,8 +127,6 @@ class MainActivity : ComponentActivity() {
 
                         Text(parent.name, modifier = Modifier.weight(1F))
                     }
-
-
                     if (hasChildren && isExpanded) {
                         children!!.forEach {
                             Row(Modifier.fillMaxWidth()) {
@@ -127,12 +135,10 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-
             }
         } else {
             Text("ぬる！！！！")
         }
-
     }
 
     @Composable
@@ -145,16 +151,9 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.align(Alignment.Center)
             )
         }
-
     }
 
-    private val mainViewModel by viewModels<MainViewModel> {
-        object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return MainViewModel(AppDatabase.getInstance(this@MainActivity)) as T
-            }
-        }
-    }
+    private val mainViewModel: MainViewModel by viewModels()
 
     @Preview
     @Composable
@@ -168,127 +167,59 @@ class MainActivity : ComponentActivity() {
         CategoriesIcon(IconText("🍔"))
     }
 
-
-
-    @OptIn(ExperimentalMaterialApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DateStringFormatter.init(FormatType.Char)
         // appDatabase = AppDatabase.getInstance(this)
 
-
         setContent {
-            Log.i("TAGGG", Date.getToday().toString())
-            val calendarState = rememberCalendarViewState()
             Compose_kakeiboTheme {
                 //AddItemBody()
                 Surface(color = MaterialTheme.colors.background) {
-                    val navController= rememberNavController()
-                    NavHost(navController,KakeiboScreen.AddItem.name){
-                        KakeiboScreen.values().forEach {
-                            composable(it.name){_->
-                                it.body()
-                            }
+                    val navController = rememberNavController()
+                    var nowScreen by remember { mutableStateOf(KakeiboScreen.Summary) }
+                    navController.addOnDestinationChangedListener { _, destination, _ ->
+                        nowScreen = KakeiboScreen.fromRoute(destination.route!!)
+                    }
+//KakeiboScreen.AddItem.name+"/{date}"
+                    NavHost(navController, KakeiboScreen.Summary.name) {
+                        buildGraph { route: String ->
+                            if (route == NAVIGATE_TO_BACK)
+                                navController.popBackStack()
+                            else
+                                navController.navigate(route)
+
                         }
                     }
+
+
                     // CategoriesList()
-                   /* val scope = rememberCoroutineScope()
-                    val sheetScrollState = rememberScrollState()
-
-                    val scaffoldState = rememberBottomSheetScaffoldState()
-                    BottomSheetScaffold(topBar = {
-                        TopAppBar(title = {
-                            Text("Kakeibo App β")
-                        }, actions = {
-                            IconButton({}) {
-                                Icon(Icons.Default.Settings, null)
-                            }
-                        })
-                    }, floatingActionButton = {
-
-                        if (calendarState.selectedDate != null && scaffoldState.bottomSheetState.isCollapsed) {
-                            ExtendedFloatingActionButton(icon = {
-                                Icon(Icons.Default.Add, null)
-                            }, text = {
-
-                                Text("追加")
-
-                            }, onClick = {
-                                TODO("追加処理")
-                            })
-                        }
-                    }, scaffoldState = scaffoldState, sheetPeekHeight = 150.dp,
-                        sheetContent = {
-                            Column(modifier = Modifier.fillMaxHeight().verticalScroll(sheetScrollState)) {
-                                val summary = mainViewModel.summary.collectAsState()
-                                if (scaffoldState.bottomSheetState.isCollapsed) {
-                                    Text(
-                                        calendarState.selectedDate?.toString()
-                                            ?: calendarState.currentDate.toStringIgnoreDay(),
-                                        style = MaterialTheme.typography.h4
-                                    )
-                                    summary.value?.also {
-                                        Text("${it.size}件のデータ")
-                                        var sumPrice = 0
-                                        it.forEach { priceProductItem ->
-                                            sumPrice += priceProductItem.price
-                                        }
-                                        Text("合計:${sumPrice}円")
-                                    }
+                    /*
+                     /* val scaffoldState = rememberBottomSheetScaffoldState()
+         */
+                     /* BottomSheetScaffold(
+                          sheetContent = {
+                              if (scaffoldState.bottomSheetState) {
+                                  TopAppBar (title = { Text("App") })
+                              }
+                              Column(modifier = Modifier.verticalScroll(sheetScrollState)) {
+                                  Text(selectedDate?.toString() ?: "選択してください", style = MaterialTheme.typography.h4)
+                                  for (i in 1..10) {
+                                      val bool = i % 2 == 0
+                                      Box(
+                                          modifier = Modifier.background(if (bool) Color.Gray else Color.Black)
+                                              .size(50.dp, 150.dp)
+                                      )
+                                  }
 
 
-                                } else {
-                                    TopAppBar(title = {
-                                        Text(
-                                            calendarState.selectedDate?.toString()
-                                                ?: calendarState.currentDate.toStringIgnoreDay()
-                                        )
-                                    }, navigationIcon = {
-                                        IconButton({}) {
-                                            Icon(Icons.Default.ArrowBack, null)
-                                        }
-                                    })
-                                }
+                              }
 
 
-                            }
-                        }) {
+                          }, sheetPeekHeight = 100.dp
+                      ) {
 
-
-                        CalendarView(DayOfWeek.Sunday, onScrolled = {
-
-                        }, onDaySelected = { date ->
-                            mainViewModel.getSummary(date ?: calendarState.currentDate, date == null)
-                            Toast.makeText(this@MainActivity, "$date", Toast.LENGTH_LONG).show()
-                        }, state = calendarState)
-
-
-                    }
-                    /* val scaffoldState = rememberBottomSheetScaffoldState()
-        */
-                    /* BottomSheetScaffold(
-                         sheetContent = {
-                             if (scaffoldState.bottomSheetState) {
-                                 TopAppBar (title = { Text("App") })
-                             }
-                             Column(modifier = Modifier.verticalScroll(sheetScrollState)) {
-                                 Text(selectedDate?.toString() ?: "選択してください", style = MaterialTheme.typography.h4)
-                                 for (i in 1..10) {
-                                     val bool = i % 2 == 0
-                                     Box(
-                                         modifier = Modifier.background(if (bool) Color.Gray else Color.Black)
-                                             .size(50.dp, 150.dp)
-                                     )
-                                 }
-
-
-                             }
-
-
-                         }, sheetPeekHeight = 100.dp
-                     ) {
-
-                     }*/*/
+                      }*/*/
                 }
             }
         }

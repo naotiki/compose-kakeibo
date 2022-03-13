@@ -6,7 +6,7 @@ class EnumExtensions {
             enumValues<T>().firstOrNull { it.ordinal == value }
 
         inline fun <reified T : Enum<T>> Int.toEnum(): T? =
-            enumValues<T>().firstOrNull { it.ordinal == this }
+            enumValues<T>().getOrNull(this)
 
         inline fun <reified T : Enum<T>> getSize(): Int =
             enumValues<T>().size

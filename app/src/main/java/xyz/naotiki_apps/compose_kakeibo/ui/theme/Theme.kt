@@ -10,6 +10,16 @@ private val DarkColorPalette = darkColors(
     primary = Purple200,
     primaryVariant = Purple700,
     secondary = Teal200
+/*
+secondaryVariant: Color = secondary,
+    background: Color = Color(0xFF121212),
+    surface: Color = Color(0xFF121212),
+    error: Color = Color(0xFFCF6679),
+    onPrimary: Color = Color.Black,
+    onSecondary: Color = Color.Black,
+    onBackground: Color = Color.White,
+    onSurface: Color = Color.White,
+    onError: Color = Color.Black*/
 )
 
 private val LightColorPalette = lightColors(
@@ -29,6 +39,7 @@ private val LightColorPalette = lightColors(
 
 @Composable
 fun Compose_kakeiboTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable() () -> Unit) {
+
     val colors = if (darkTheme) {
         DarkColorPalette
     } else {

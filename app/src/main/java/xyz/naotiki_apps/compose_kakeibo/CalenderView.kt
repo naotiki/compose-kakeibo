@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.NavigateNext
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -30,41 +31,44 @@ import xyz.naotiki_apps.compose_kakeibo.DateStringFormatter.Companion.MONTH
 import xyz.naotiki_apps.compose_kakeibo.DateStringFormatter.Companion.YEAR
 import xyz.naotiki_apps.compose_kakeibo.DateStringFormatter.Companion.isDataFormat
 
-class CalendarViewState(currentData: Date, selectedDate: Date?, onDaySelected: (Date?) -> Unit) {
+class CalendarViewState(currentData: Date, selectedDate: Date?) {
     var currentDate: Date by mutableStateOf(currentData)
     var selectedDate: Date? by mutableStateOf(selectedDate)
-    private var _onDaySelected: (Date?) -> Unit by mutableStateOf(onDaySelected)
-    fun setOnDaySelected(onDaySelected: (Date?) -> Unit) {
-        _onDaySelected = onDaySelected
-    }
+    var eventDays by mutableStateOf<MutableSet<Date>>(mutableSetOf())
 
-    fun selectDate(date: Date?) {
-        selectedDate = date
-        _onDaySelected(date)
-    }
+
 }
 
 @Composable
 fun rememberCalendarViewState(
     currentData: Date = Date.getToday(true),
-    selectedDate: Date? = Date.getToday(), onDaySelected: (Date?) -> Unit = {}
+    selectedDate: Date? = Date.getToday()
 ): CalendarViewState {
     return remember {
-        CalendarViewState(currentData, selectedDate, onDaySelected)
+        CalendarViewState(currentData, selectedDate)
     }
+}
+class EventBuilder(val range: DateRange){
+    val events= mutableSetOf<Date>()
+    fun append(vararg date: Date){
+        events.addAll(date.filter { it in range })
+    }
+
 }
 
 @Composable
 fun CalendarView(
     firstDayOfDayOfWeek: CalendarUtil.DayOfWeek,
+    eventBuilder:EventBuilder.()->Unit={},
     onDaySelected: (Date?) -> Unit,
     onScrolled: (Direction) -> Unit = {},
 
-    state: CalendarViewState = rememberCalendarViewState(onDaySelected = onDaySelected),
+    state: CalendarViewState = rememberCalendarViewState(),
 ) {
-
+    LaunchedEffect(Unit){
+        onDaySelected(state.selectedDate)
+    }
     var dialogOpen by remember { mutableStateOf(false) }
-
     if (dialogOpen) {
         Dialog(onDismissRequest = {
             dialogOpen = false
@@ -87,10 +91,9 @@ fun CalendarView(
                     )
                 )
             }
-            Surface(color = MaterialTheme.colors.background) {
+            Surface(color = MaterialTheme.colors.background, modifier = Modifier.clip(RoundedCornerShape(4.dp))) {
                 Column(modifier = Modifier.padding(10.dp)) {
                     Text("日付を選択")
-
                     Row {
                         OutlinedTextField(
                             yearText, modifier = Modifier.focusRequester(yearTextFocus),
@@ -147,8 +150,9 @@ fun CalendarView(
     Box(
         Modifier.padding(top = 10.dp)
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
-                state.selectDate(null)
-            }.background(Color(0x3F, 0x3F, 0x3F), RoundedCornerShape(10.dp))
+                state.selectedDate = null
+                onDaySelected(null)
+            }.background(MaterialTheme.colors.secondary, RoundedCornerShape(10.dp))
     ) {
         Column {
             Row(
@@ -158,7 +162,7 @@ fun CalendarView(
                 IconButton({
                     loopPagerState.animateTo(Direction.Previous)
                 }, Modifier.weight(0.5F)) {
-                    Icon(Icons.Filled.NavigateBefore, null)
+                    Icon(Icons.Filled.NavigateBefore, null, tint =  MaterialTheme.colors.onPrimary)
                 }
 
                 Text(
@@ -168,24 +172,35 @@ fun CalendarView(
                         .clickable {
                             dialogOpen = true
                         },
+                    color = MaterialTheme.colors.onPrimary,
                     style = MaterialTheme.typography.h4
                 )
                 IconButton({
                     loopPagerState.animateTo(Direction.Next)
                 }, Modifier.weight(0.5F)) {
-                    Icon(Icons.Filled.NavigateNext, null)
+                    Icon(Icons.Filled.NavigateNext, null, tint =  MaterialTheme.colors.onPrimary)
                 }
             }
-            LoopPager(loopPagerState, {
-                onScrolled(it)
-                state.currentDate = state.currentDate.shiftMonth(it)
+            LoopPager(loopPagerState, { direction ->
+                onScrolled(direction)
+                state.currentDate = state.currentDate.shiftMonth(direction)
+                val eventRange=state.currentDate.shiftMonth(Direction.Previous)..
+                        state.currentDate.shiftMonth(Direction.Next)
+                state.eventDays.removeIf {
+                    it !in eventRange
+                }
+                val eb=EventBuilder(eventRange)
+                eb.eventBuilder()
+                state.eventDays=eb.events
+
             }, {
                 MonthView(
                     state.selectedDate, state.currentDate.shiftMonth(Direction.Previous), false, firstDayOfDayOfWeek
                 )
             }, {
                 MonthView(state.selectedDate, state.currentDate, true, firstDayOfDayOfWeek) {
-                    state.selectDate(it)
+                    state.selectedDate = it
+                    onDaySelected(it)
                 }
             }, {
                 MonthView(
@@ -221,12 +236,9 @@ fun MonthView(
                     dayOfWeek.str, color = when (dayOfWeek) {
                         CalendarUtil.DayOfWeek.Sunday -> Color.Red
                         CalendarUtil.DayOfWeek.Saturday -> Color.Blue
-                        else -> Color.Unspecified
+                        else -> MaterialTheme.colors.onSecondary
                     }, modifier = Modifier.width(50.dp), textAlign = TextAlign.Center
                 )
-
-
-
                 dayOfWeek = dayOfWeek.slideToNextWithLoop()
             }
         }
@@ -242,7 +254,7 @@ fun MonthView(
                     } else {
                         Day(dayCount,
                             isSelected = date.copy(day = dayCount) == selectedDate,
-                            hasData = false,
+                            hasEvent = false,
                             textColor = when (it) {
                                 CalendarUtil.DayOfWeek.Sunday -> Color.Red
                                 CalendarUtil.DayOfWeek.Saturday -> Color.Blue
@@ -271,7 +283,7 @@ fun MonthView(
 fun Day(
     day: Int,
     isSelected: Boolean = false,
-    hasData: Boolean = false,
+    hasEvent: Boolean = false,
     textColor: Color = Color.Unspecified,
     onClick: (Int) -> Unit = {}
 ) {
@@ -285,7 +297,7 @@ fun Day(
             Box(Modifier.fillMaxSize().padding(4.dp).background(Color(30, 186, 163, 0x5F), RoundedCornerShape(25)))
         }
         Text(day.toString(), Modifier.align(Alignment.Center), textColor)
-        if (hasData) {
+        if (hasEvent) {
             Icon(
                 Icons.Filled.Circle,
                 null,

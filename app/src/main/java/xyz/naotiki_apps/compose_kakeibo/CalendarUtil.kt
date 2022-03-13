@@ -13,53 +13,64 @@ import xyz.naotiki_apps.compose_kakeibo.EnumExtensions.Companion.toEnum
 class DateRange : ClosedRange<Date> {
     var minDate: Date
     var maxDate: Date
+
     //使うかわからん
     constructor(date: Date) {
-        date.day = 1
-        minDate = date
-        date.day = CalendarUtil.dateScope(date) {
+        //date.day = 1
+        minDate = date.copy(day = 1)
+        maxDate = date.copy(day = CalendarUtil.dateScope(date) {
             getDayOfMonthCount()
-        }
-        maxDate = date
+        })
     }
+
     constructor(minDate: Date, maxDate: Date) {
         this.minDate = minDate
         this.maxDate = maxDate
     }
+
     override val endInclusive: Date
         get() = maxDate
     override val start: Date
         get() = minDate
-    companion object{
-        fun Date.asOneDayDateRange(): DateRange = DateRange(this,this)
+
+    override fun toString(): String {
+        return "${minDate.toInt()}<=${maxDate.toInt()}"
+    }
+
+    companion object {
+        fun Date.asOneDayDateRange(): DateRange = DateRange(this, this)
     }
 }
+
 
 /**
  * @param month 1<=12
  * */
 @Parcelize
 data class Date(var year: Int, var month: Int, var day: Int = 1) : Comparable<Date>, Parcelable {
+    //CalenderClass用 -1しただけよ
     val innerMonth get() = month - 1
     override fun toString() = DateStringFormatter.getInstance().dateToString(this)
+
     //日付無視
     fun toStringIgnoreDay(): String = DateStringFormatter.getInstance().dateToString(this, true)
 
     //意外と数学って使うのねー
+    //(y*12+m)*32+d
     fun toInt(): Int = (year * 12 + innerMonth) * 32 + day
-    fun shiftMonth(direction: Direction): Date = when (direction) {
-        Previous -> if (month == 1) {
-            copy(year = year - 1, month = 12)
-        } else {
-            copy(year = year, month = month - 1)
-        }
 
-        Next -> if (month == 12) {
-            copy(year = year + 1, month = 1)
-        } else {
-            copy(year = year, month = month + 1)
-        }
+    fun toMilliLong(): Long {
+        val calendar = CalendarUtil.getCalender()
+        calendar.set(year, innerMonth, day)
+        return calendar.timeInMillis
     }
+
+    //月をずらす(年も必要に応じて)
+    fun shiftMonth(direction: Direction): Date = when (direction) {
+        Previous -> if (month == 1) copy(year = year - 1, month = 12) else copy(year = year, month = month - 1)
+        Next -> if (month == 12) copy(year = year + 1, month = 1) else copy(year = year, month = month + 1)
+    }
+
 
     companion object {
         //0から始まるから %12で大丈夫なんですねー
@@ -71,22 +82,37 @@ data class Date(var year: Int, var month: Int, var day: Int = 1) : Comparable<Da
             return Date(year, month + 1, day)
         }
 
-        private val calendar: Calendar = Calendar.getInstance(ULocale("ja_JP"))
-        fun getToday(ignoreDay: Boolean = false): Date {
-            calendar.timeInMillis = System.currentTimeMillis()
+        //EpochタイムからDateをつくる
+        fun dateFromLong(long: Long): Date {
+            CalendarUtil.getCalender().timeInMillis = long
             return Date(
-                calendar.get(Calendar.YEAR),
-                calendar.get(Calendar.MONTH) + 1,
-                if (ignoreDay) 1 else calendar.get(Calendar.DAY_OF_MONTH)
+                CalendarUtil.getCalender().get(Calendar.YEAR),
+                CalendarUtil.getCalender().get(Calendar.MONTH) + 1,
+                CalendarUtil.getCalender().get(Calendar.DAY_OF_MONTH)
             )
         }
-    }
 
+        /**
+         * 今日の日付取得
+         * @param ignoreDay trueなら月のみ
+         * */
+        fun getToday(ignoreDay: Boolean = false): Date {
+            val r = dateFromLong(System.currentTimeMillis())
+            return if (ignoreDay) {
+                r.copy(day = 1)
+            } else {
+                r
+            }
+
+        }
+    }
     operator fun rangeTo(b: Date): DateRange = DateRange(this, b)
     override fun compareTo(other: Date): Int = this.toInt().compareTo(other.toInt())
+
 }
 
 class CalendarUtil private constructor() {
+    @Suppress("unused")
     enum class DayOfWeek(val str: String) {
         Sunday("日"),
         Monday("月"),
@@ -97,7 +123,7 @@ class CalendarUtil private constructor() {
         Saturday("土");
     }
 
-    private val calendar: Calendar = Calendar.getInstance(ULocale("ja_JP"))
+
     fun getMonthDayOfWeeks(): List<DayOfWeek> {
         val dayCount = getDayOfMonthCount()
         val firstDayOfWeek = getMonthFirstDayOfWeek()
@@ -139,22 +165,25 @@ class CalendarUtil private constructor() {
         return result
     }
 
-    fun getDayOfMonthCount(): Int = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+    fun getDayOfMonthCount(): Int = _calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
     private fun getMonthFirstDayOfWeek(): DayOfWeek {
-        calendar.set(Calendar.DATE, 1)
-        return (calendar.get(Calendar.DAY_OF_WEEK) - 1).toEnum<DayOfWeek>()!!
+        _calendar.set(Calendar.DATE, 1)
+        return (_calendar.get(Calendar.DAY_OF_WEEK) - 1).toEnum<DayOfWeek>()!!
     }
 
     fun setDate(date: Date): CalendarUtil {
-        calendar.set(date.year, date.innerMonth, 1)
+        _calendar.set(date.year, date.innerMonth, 1)
         return this
     }
 
     companion object {
+        private val _calendar: Calendar = Calendar.getInstance(ULocale("ja_JP"))
+        fun getCalender() = _calendar
+
         @Volatile
         private var instance = CalendarUtil()
 
-        fun <T> dateScope(date: Date, block: CalendarUtil.() -> T) = with(instance.setDate(date),block)
+         fun <T> dateScope(date: Date, block: CalendarUtil.() -> T) = with(instance.setDate(date), block)
     }
 }
 
