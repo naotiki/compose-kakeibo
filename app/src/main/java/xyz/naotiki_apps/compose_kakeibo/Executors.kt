@@ -23,11 +23,12 @@ private val IO_EXECUTOR = CoroutineScope(Dispatchers.IO)
 /**
  * Utility method to run blocks on a dedicated background thread, used for io/database work.
  */
-fun <T> ioThread(onComplete: (T?,Throwable?) -> Unit={_,_->},body: CoroutineScope.() -> T) {
+fun <T> ioThread(onComplete: (T?,Throwable?) -> Unit={_,_->},body:suspend CoroutineScope.() -> T) {
     var result :T?=null
     IO_EXECUTOR.launch{
        result= body()
-    }.invokeOnCompletion {
+    }
+        .invokeOnCompletion {
         onComplete(result,it)
     }
 }

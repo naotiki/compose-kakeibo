@@ -1,39 +1,45 @@
 package xyz.naotiki_apps.compose_kakeibo
 
 import androidx.compose.runtime.Composable
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.*
 import androidx.navigation.compose.composable
 
-typealias NavigateFunc=(route:String)->Unit
+//いちいちこうかくのめんどいからえいりあす
+typealias NavigateFunc = (route: String) -> Unit
+
 
 
 enum class KakeiboScreen(
-    val body: @Composable (NavBackStackEntry,toNavigate:NavigateFunc) -> Unit,
+    val body: @Composable (NavBackStackEntry, toNavigate: NavigateFunc) -> Unit,
     private val args: List<NamedNavArgument>? = null
 ) {
     Summary(
-        {_,nav-> SummaryBody(hiltViewModel()) { nav(AddItem.name+"/"+it) } }),
-    AddItem( {it,nav->
-            AddItemBody(Date.dateFromInt(it.arguments?.getInt("date")!!),nav)
+        { _, nav -> SummaryBody() { nav(AddItem.name + "/" + it) } }),
+    AddItem(
+        { it, nav ->
+            AddItemBody(Date.dateFromInt(it.arguments?.getInt("date")!!), nav)
         },
-        listOf(navArgument("date") { type = NavType.IntType
-            defaultValue=Date.getToday().toInt() })
-    );
-
-
+        listOf(navArgument("date") {
+            type = NavType.IntType
+            defaultValue = Date.getToday().toInt()
+        })
+    ),
+    Detail({ _: NavBackStackEntry, _: NavigateFunc ->
+        DetailBody()
+    });
 
 
     companion object {
-        const val NAVIGATE_TO_BACK="navigate_to_back"
+        const val NAVIGATE_TO_BACK = "navigate_to_back"
         fun fromRoute(route: String): KakeiboScreen {
             return values().first {
                 it.name == route.split("/")[0]
             }
         }
 
-        fun NavGraphBuilder.buildGraph(toNavigate:(route:String)->Unit) {
-            values().forEach {screen->
+        fun NavGraphBuilder.buildGraph(toNavigate: (route: String) -> Unit) {
+
+            values().forEach { screen ->
                 var appendStr = ""
                 if (screen.args != null) {
                     appendStr = buildString {
@@ -45,7 +51,7 @@ enum class KakeiboScreen(
                     }
                 }
                 composable("${screen.name}$appendStr", arguments = screen.args.orEmpty()) { backStackEntry ->
-                    screen.body(backStackEntry,toNavigate)
+                    screen.body(backStackEntry, toNavigate)
                 }
             }
 

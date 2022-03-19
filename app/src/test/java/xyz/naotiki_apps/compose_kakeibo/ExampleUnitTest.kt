@@ -15,6 +15,16 @@ import xyz.naotiki_apps.compose_kakeibo.ColorData.Companion.toColorData
  */
 
 class ExampleUnitTest {
+
+   //String.firstLetter Test
+    @Test
+    fun firstLetterTest(){
+        val test = "test"
+        val result = test.firstLetter()
+        Assert.assertEquals("t",result)
+    }
+
+
     @Test
     fun sort(){
         val DEFAULT_CATEGORIES = arrayOf(
@@ -35,10 +45,7 @@ class ExampleUnitTest {
     fun `日付変換`() {
         var date = Date(2022, 1, 1)
         for (i in 0..36) {
-
-
-
-
+            
            val dayCount= CalendarUtil.dateScope(date.copy()){
                 getDayOfMonthCount()
             }

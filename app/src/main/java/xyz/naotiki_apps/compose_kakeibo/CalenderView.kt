@@ -1,6 +1,7 @@
 package xyz.naotiki_apps.compose_kakeibo
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -13,6 +14,8 @@ import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.NavigateBefore
 import androidx.compose.material.icons.filled.NavigateNext
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.mapSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,43 +34,43 @@ import xyz.naotiki_apps.compose_kakeibo.DateStringFormatter.Companion.MONTH
 import xyz.naotiki_apps.compose_kakeibo.DateStringFormatter.Companion.YEAR
 import xyz.naotiki_apps.compose_kakeibo.DateStringFormatter.Companion.isDataFormat
 
-class CalendarViewState(currentData: Date, selectedDate: Date?) {
-    var currentDate: Date by mutableStateOf(currentData)
+class CalendarViewState(currentDate: Date, selectedDate: Date?) {
+    var currentDate: Date by mutableStateOf(currentDate)
     var selectedDate: Date? by mutableStateOf(selectedDate)
-    var eventDays by mutableStateOf<MutableSet<Date>>(mutableSetOf())
+}
 
-
+val calendarViewStateSaver = run {
+    val currentDateKey = "CurrentDate"
+    val selectedDateKey = "SelectedDate"
+    mapSaver(
+        save = { mapOf(currentDateKey to it.currentDate, selectedDateKey to it.selectedDate) },
+        restore = { CalendarViewState(it[currentDateKey] as Date, it[selectedDateKey] as Date?) }
+    )
 }
 
 @Composable
 fun rememberCalendarViewState(
-    currentData: Date = Date.getToday(true),
+    currentDate: Date = Date.getToday(true),
     selectedDate: Date? = Date.getToday()
 ): CalendarViewState {
-    return remember {
-        CalendarViewState(currentData, selectedDate)
+    return rememberSaveable(saver = calendarViewStateSaver) {
+        CalendarViewState(currentDate, selectedDate)
     }
 }
-class EventBuilder(val range: DateRange){
-    val events= mutableSetOf<Date>()
-    fun append(vararg date: Date){
-        events.addAll(date.filter { it in range })
-    }
 
-}
 
 @Composable
 fun CalendarView(
     firstDayOfDayOfWeek: CalendarUtil.DayOfWeek,
-    eventBuilder:EventBuilder.()->Unit={},
+    eventDays: Set<Date>,
     onDaySelected: (Date?) -> Unit,
-    onScrolled: (Direction) -> Unit = {},
+    onScrolled: (currentData:Date) -> Unit = {},
 
     state: CalendarViewState = rememberCalendarViewState(),
 ) {
-    LaunchedEffect(Unit){
-        onDaySelected(state.selectedDate)
-    }
+    val currentOnDaySelected by rememberUpdatedState(onDaySelected)
+    val currentOnScrolled by rememberUpdatedState(onScrolled)
+
     var dialogOpen by remember { mutableStateOf(false) }
     if (dialogOpen) {
         Dialog(onDismissRequest = {
@@ -151,7 +154,7 @@ fun CalendarView(
         Modifier.padding(top = 10.dp)
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
                 state.selectedDate = null
-                onDaySelected(null)
+                currentOnDaySelected(null)
             }.background(MaterialTheme.colors.secondary, RoundedCornerShape(10.dp))
     ) {
         Column {
@@ -162,7 +165,7 @@ fun CalendarView(
                 IconButton({
                     loopPagerState.animateTo(Direction.Previous)
                 }, Modifier.weight(0.5F)) {
-                    Icon(Icons.Filled.NavigateBefore, null, tint =  MaterialTheme.colors.onPrimary)
+                    Icon(Icons.Filled.NavigateBefore, null, tint = MaterialTheme.colors.onPrimary)
                 }
 
                 Text(
@@ -178,33 +181,37 @@ fun CalendarView(
                 IconButton({
                     loopPagerState.animateTo(Direction.Next)
                 }, Modifier.weight(0.5F)) {
-                    Icon(Icons.Filled.NavigateNext, null, tint =  MaterialTheme.colors.onPrimary)
+                    Icon(Icons.Filled.NavigateNext, null, tint = MaterialTheme.colors.onPrimary)
                 }
             }
-            LoopPager(loopPagerState, { direction ->
-                onScrolled(direction)
-                state.currentDate = state.currentDate.shiftMonth(direction)
-                val eventRange=state.currentDate.shiftMonth(Direction.Previous)..
-                        state.currentDate.shiftMonth(Direction.Next)
-                state.eventDays.removeIf {
-                    it !in eventRange
-                }
-                val eb=EventBuilder(eventRange)
-                eb.eventBuilder()
-                state.eventDays=eb.events
 
+            LoopPager(loopPagerState, { direction ->
+                state.currentDate = state.currentDate.shiftMonth(direction)
+                currentOnScrolled(state.currentDate)
             }, {
+
                 MonthView(
-                    state.selectedDate, state.currentDate.shiftMonth(Direction.Previous), false, firstDayOfDayOfWeek
+                    state.selectedDate,
+                    state.currentDate.shiftMonth(Direction.Previous),
+                    false,
+                    firstDayOfDayOfWeek,
                 )
             }, {
-                MonthView(state.selectedDate, state.currentDate, true, firstDayOfDayOfWeek) {
+
+                MonthView(
+                    state.selectedDate,
+                    state.currentDate,
+                    true,
+                    firstDayOfDayOfWeek,
+                    eventDays.filter { it in DateRange(state.currentDate) }.toSet()
+                ) {
                     state.selectedDate = it
-                    onDaySelected(it)
+                    currentOnDaySelected(it)
                 }
             }, {
+
                 MonthView(
-                    state.selectedDate, state.currentDate.shiftMonth(Direction.Next), false, firstDayOfDayOfWeek
+                    state.selectedDate, state.currentDate.shiftMonth(Direction.Next), false, firstDayOfDayOfWeek,
                 )
             })
 
@@ -220,6 +227,7 @@ fun MonthView(
     date: Date,
     isCurrentMonth: Boolean,
     firstDayOfDayOfWeek: CalendarUtil.DayOfWeek,
+    eventDays: Set<Date>? = null,
     onDaySelected: ((date: Date) -> Unit)? = null
 ) {
 
@@ -252,9 +260,11 @@ fun MonthView(
                     if (it == null) {
                         Spacer(Modifier.size(50.dp))
                     } else {
-                        Day(dayCount,
-                            isSelected = date.copy(day = dayCount) == selectedDate,
-                            hasEvent = false,
+                        val dayDate = date.copy(day = dayCount)
+
+                        Day(dayCount, isToDay = dayDate == Date.getToday(),
+                            isSelected = dayDate == selectedDate,
+                            hasEvent = eventDays?.contains(dayDate) ?: false,
                             textColor = when (it) {
                                 CalendarUtil.DayOfWeek.Sunday -> Color.Red
                                 CalendarUtil.DayOfWeek.Saturday -> Color.Blue
@@ -285,7 +295,8 @@ fun Day(
     isSelected: Boolean = false,
     hasEvent: Boolean = false,
     textColor: Color = Color.Unspecified,
-    onClick: (Int) -> Unit = {}
+    onClick: (Int) -> Unit = {},
+    isToDay: Boolean
 ) {
     Box(Modifier.size(50.dp).clickable(onClick = { onClick(day) })) {
         Box(
@@ -295,7 +306,10 @@ fun Day(
         )
         if (isSelected) {
             Box(Modifier.fillMaxSize().padding(4.dp).background(Color(30, 186, 163, 0x5F), RoundedCornerShape(25)))
+        } else if (isToDay) {
+            Box(Modifier.fillMaxSize().padding(4.dp).border(2.dp, Color(30, 186, 163, 0x5F), RoundedCornerShape(25)))
         }
+
         Text(day.toString(), Modifier.align(Alignment.Center), textColor)
         if (hasEvent) {
             Icon(

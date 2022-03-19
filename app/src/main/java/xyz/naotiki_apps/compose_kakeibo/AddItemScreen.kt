@@ -5,6 +5,7 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -12,12 +13,14 @@ import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,11 +29,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.text.isDigitsOnly
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.asLiveData
+import androidx.lifecycle.distinctUntilChanged
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
@@ -42,9 +46,11 @@ import javax.inject.Inject
 @HiltViewModel
 class AddItemViewModel @Inject constructor(
     @ApplicationContext application: Context,
-    private val itemDataRepository: ItemDataRepository
+    private val itemDataRepository: ItemDataRepository,
+    private val categoryRepository: CategoryRepository
 ) : AndroidViewModel(application as Application) {
 
+    val allCategories=categoryRepository.getAllCategories().asLiveData().distinctUntilChanged()
     private val speechRecognizer: SpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(application).also {
         it.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(p0: Bundle?) {
@@ -153,7 +159,13 @@ class AddItemViewModel @Inject constructor(
 
     fun addItemData(date: Date, name: String, price: String, categoryId: Int) {
         if (name.isNotBlank() && price.isNotBlank() && price.isDigitsOnly()) {
-            itemDataRepository.insertItemData(ItemData(date = date, name = name, price = price.toInt(), categoryId = categoryId))
+            ioThread({_,e->
+                if (e == null) {
+                    Looper.prepare()
+                    Toast.makeText(getApplication(),"正常に追加されました",Toast.LENGTH_SHORT).show()
+                    Looper.loop()
+                }
+            }) {itemDataRepository.insertItemData(ItemData(date = date, name = name, price = price.toInt(), categoryId = categoryId))}
         }
     }
 }
@@ -165,7 +177,6 @@ fun AddItemBody(
     date: Date,
     toNavigateFunc: NavigateFunc,
     viewModel: AddItemViewModel = hiltViewModel(),
-    mainViewModel: MainViewModel = hiltViewModel()
 ) {
     val micPermissionState = rememberPermissionState(
         Manifest.permission.RECORD_AUDIO
@@ -278,8 +289,8 @@ fun AddItemBody(
             Text(viewModel.speechState.message ?: viewModel.hearText!!)
             if (viewModel.speechState == AddItemViewModel.SpeechState.Done) {
                 val (resultName, resultPrice) = viewModel.parseHearText()
-                name = resultName
-                price = (resultPrice ?: "").toString()
+                name = resultName.ifEmpty { name }
+                price = (resultPrice)?.toString()?:price
                 viewModel.speechState = AddItemViewModel.SpeechState.None
             }
             if (!canStart) {
@@ -291,7 +302,7 @@ fun AddItemBody(
              Text(viewModel.speechSoundLevel.toString())
              Box(Modifier.background(Color.Red, CircleShape).animateContentSize().size((viewModel.speechSoundLevel*2+50).dp))
              */
-            val allCategory by mainViewModel.allCategories.collectAsState(null)
+            val allCategory by viewModel.allCategories.observeAsState()
             var expanded by remember { mutableStateOf(false) }
             var selectedCategoryId: Int by remember { mutableStateOf(1) }
             Column {
@@ -310,37 +321,9 @@ fun AddItemBody(
                 )
                 if (allCategory != null) {
                     Row {
-                        val categoriesWithChildren = mainViewModel.getAllCategoriesWithChildren(allCategory!!)
-                        DropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = {
-                                expanded = false
-                            }
-                        ) {
-                            categoriesWithChildren.forEach { (parent, children) ->
-                                val hasChildren = children != null
-                                if (hasChildren) {
-                                    Text(parent.name, Modifier.padding(5.dp))
-                                    Divider()
-                                    children!!.forEach {
-                                        DropdownMenuItem({
-                                            selectedCategoryId = it.id
-                                            expanded = false
-                                        }) { Spacer(Modifier.width(10.dp)); Text(it.name) }
-                                    }
-                                    Divider()
-
-                                } else {
-                                    DropdownMenuItem({
-                                        selectedCategoryId = parent.id
-                                        expanded = false
-                                    }) {
-                                        Text(parent.name)
-                                    }
-                                }
-
-                            }
-
+                        CategoriesDropDown(expanded,{expanded=false},allCategory.orEmpty()){
+                            expanded=false
+                            selectedCategoryId=it.id
                         }
                     }
                 }

@@ -14,7 +14,9 @@ class DateRange : ClosedRange<Date> {
     var minDate: Date
     var maxDate: Date
 
-    //使うかわからん
+    /**
+     *日付を一ヵ月とみなす
+     * */
     constructor(date: Date) {
         //date.day = 1
         minDate = date.copy(day = 1)
@@ -23,6 +25,10 @@ class DateRange : ClosedRange<Date> {
         })
     }
 
+    /**
+     * 一日のみの場合は[asOneDayDateRange]を使おう！！
+     * @see asOneDayDateRange
+     * */
     constructor(minDate: Date, maxDate: Date) {
         this.minDate = minDate
         this.maxDate = maxDate
@@ -81,7 +87,7 @@ data class Date(var year: Int, var month: Int, var day: Int = 1) : Comparable<Da
             val year = ((y12m - month) / 12)
             return Date(year, month + 1, day)
         }
-
+        //ｴﾎﾟｯｸ
         //EpochタイムからDateをつくる
         fun dateFromLong(long: Long): Date {
             CalendarUtil.getCalender().timeInMillis = long
