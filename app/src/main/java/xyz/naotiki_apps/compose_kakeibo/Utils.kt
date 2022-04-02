@@ -2,6 +2,8 @@ package xyz.naotiki_apps.compose_kakeibo
 
 import androidx.compose.runtime.snapshots.SnapshotStateList
 
+val KakeiboScreen.Companion.a: String
+    get() = "ssss"
 
 /**
  * 最初の文字を取得する
@@ -9,6 +11,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
  * - 絵文字とか𠮷田さん向け
  * */
 fun String.firstLetter(): String {
+
     val int = this.codePointAt(0)
     //サロゲ...じゃなきゃそのままreturn
     if (int <= 0xFFFF) return this[0].toString()
@@ -22,4 +25,5 @@ fun String.firstLetter(): String {
 //Setのようにあつかいたーい
 fun <T> SnapshotStateList<T>.addAsSet(values: Iterable<T>) = this.addAll(values.filter { !this.contains(it) })
 fun <T> SnapshotStateList<T>.addAsSet(vararg values: T) = this.addAsSet(values.toList())
+
 

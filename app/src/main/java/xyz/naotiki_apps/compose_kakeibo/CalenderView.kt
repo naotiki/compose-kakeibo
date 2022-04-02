@@ -176,7 +176,7 @@ fun CalendarView(
                             dialogOpen = true
                         },
                     color = MaterialTheme.colors.onPrimary,
-                    style = MaterialTheme.typography.h4
+                    style = MaterialTheme.typography.h5
                 )
                 IconButton({
                     loopPagerState.animateTo(Direction.Next)

@@ -11,7 +11,7 @@ import xyz.naotiki_apps.compose_kakeibo.ColorData.Companion.toColorData
     entities = [ItemData::class, Category::class],
     version = 1,
     exportSchema = true,
-    // autoMigrations = [AutoMigration(from = 2, to = 3)]
+    //autoMigrations = [AutoMigration(from = 1, to = 2)]
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -46,15 +46,15 @@ abstract class AppDatabase : RoomDatabase() {
         val DEFAULT_CATEGORIES = arrayOf(
             Category(id = 1, name = "未設定"),
             *Category(id = 2, name = "食品", color = Color.Red.toColorData()).addChildren(
-                Category(name = "野菜", color = null),
-                Category(name = "肉、魚", color = null),
-                Category(name = "主食", color = null),
-                Category(name = "嗜好品、果物", color = null),
-                Category(name = "惣菜、カップ麺等", color = null),
-                Category(name = "調味料、その他", color = null)
+                Category(name = "野菜"),
+                Category(name = "肉、魚"),
+                Category(name = "主食"),
+                Category(name = "嗜好品、果物"),
+                Category(name = "惣菜、カップ麺等"),
+                Category(name = "調味料、その他")
             ),
             Category(id = 3, name = "日用品", color = Color.Blue.toColorData()),
-            Category(id = 4, name = "その他", color = Color.Gray.toColorData()),
+            Category(id = 4, name = "その他"),
         ).sortById()
     }
 }

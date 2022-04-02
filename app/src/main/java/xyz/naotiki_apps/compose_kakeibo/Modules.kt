@@ -34,4 +34,10 @@ object Modules {
     @Provides
     fun provideItemDataRepository(itemDataDao: ItemDataDao) = ItemDataRepository(itemDataDao)
 
+    @Singleton
+    @Provides
+    fun providePreference(
+        @ApplicationContext context: Context
+    )= context.getSharedPreferences(SHARED_PREFERENCES_SETTINGS,Context.MODE_PRIVATE)!!
 }
+const val SHARED_PREFERENCES_SETTINGS="kakeibo_settings"

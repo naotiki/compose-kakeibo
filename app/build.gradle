@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId "xyz.naotiki_apps.compose_kakeibo"
-        minSdk 24
+        minSdk 26
         targetSdk 31
         versionCode 1
         versionName "1.0"
@@ -88,7 +88,7 @@ dependencies {
     implementation "androidx.room:room-testing:$room_version"
     implementation "androidx.room:room-ktx:$room_version"
     //Accompanist
-    implementation 'com.google.accompanist:accompanist-permissions:0.24.3-alpha'
+    implementation 'com.google.accompanist:accompanist-permissions:0.24.4-alpha'
     //Graph
     implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
     //Paging

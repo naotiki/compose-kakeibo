@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
+import xyz.naotiki_apps.compose_kakeibo.Category.Companion.sortById
 
 @Entity(
     tableName = "category", indices = [Index(
@@ -61,6 +62,7 @@ data class Category(
             } else {
                 o1.id.compareTo(o2.id)
             }
+
         }
 
         /**
@@ -69,7 +71,10 @@ data class Category(
          * */
         fun Array<out Category>.sortById(): Array<Category> = this.sortedWith(comparator).toTypedArray()
 
+
     }
+
+
 }
 
 data class CategoryAndProductItem(
@@ -80,7 +85,7 @@ data class CategoryAndProductItem(
 @Dao
 interface CategoryDao {
     /**
-     * よいこのみんなは[PrimaryKey.autoGenerate]による重複を防ぐため [sortById]を使ってから入れようね！！
+     * よいこのみんなは[PrimaryKey.autoGenerate]による重複を防ぐため [Category.sortById]を使ってから入れようね！！
      * */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     fun insertAll(vararg categories: Category)

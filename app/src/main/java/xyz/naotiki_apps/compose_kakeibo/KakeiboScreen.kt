@@ -8,7 +8,6 @@ import androidx.navigation.compose.composable
 typealias NavigateFunc = (route: String) -> Unit
 
 
-
 enum class KakeiboScreen(
     val body: @Composable (NavBackStackEntry, toNavigate: NavigateFunc) -> Unit,
     private val args: List<NamedNavArgument>? = null
@@ -26,11 +25,17 @@ enum class KakeiboScreen(
     ),
     Detail({ _: NavBackStackEntry, _: NavigateFunc ->
         DetailBody()
+    }),
+    SettingsScreen({ navBackStackEntry: NavBackStackEntry, function: NavigateFunc ->
+        SettingsBody()
+    }),
+    CategorySettings({ _: NavBackStackEntry, _: NavigateFunc ->
+        CategorySettingsBody()
     });
 
 
     companion object {
-        const val NAVIGATE_TO_BACK = "navigate_to_back"
+        const val NAVIGATE_TO_BACK = "kakeibo_navigate_to_back"
         fun fromRoute(route: String): KakeiboScreen {
             return values().first {
                 it.name == route.split("/")[0]

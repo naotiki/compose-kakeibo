@@ -6,12 +6,12 @@ class DateStringFormatter(private var formatType: Array<String>) {
     /**
      * @see init
      * */
-    object FormatType {
-        val Slash = arrayOf("/", "/", "")
-        val Char = arrayOf("年", "月", "日")
+    enum class FormatType(val spliter: Array<String>) {
+        Slash(arrayOf("/", "/", "")),
+        Char(arrayOf("年", "月", "日"))
     }
 
-    fun dateToString(date: Date, ignoreDay: Boolean=false): String = buildString {
+    fun dateToString(date: Date, ignoreDay: Boolean = false): String = buildString {
         append(date.year)
         append(formatType[0])
         append(date.month)
@@ -29,9 +29,9 @@ class DateStringFormatter(private var formatType: Array<String>) {
         /**
          * @param formatType [FormatType]から選ぼうね！！
          * */
-        fun init(formatType: Array<String>): DateStringFormatter {
+        fun init(formatType: FormatType): DateStringFormatter {
             return INSTANCE ?: kotlin.run {
-                INSTANCE = DateStringFormatter(formatType)
+                INSTANCE = DateStringFormatter(formatType.spliter)
                 return INSTANCE as DateStringFormatter
             }
         }

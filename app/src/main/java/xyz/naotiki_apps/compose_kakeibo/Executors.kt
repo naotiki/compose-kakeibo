@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 private val IO_EXECUTOR = CoroutineScope(Dispatchers.IO)
 
 /**
- * Utility method to run blocks on a dedicated background thread, used for io/database work.
+ * io/database作業に使用される、専用のバックグラウンドスレッドでブロックを実行するユーティリティメソッド。
  */
 fun <T> ioThread(onComplete: (T?,Throwable?) -> Unit={_,_->},body:suspend CoroutineScope.() -> T) {
     var result :T?=null

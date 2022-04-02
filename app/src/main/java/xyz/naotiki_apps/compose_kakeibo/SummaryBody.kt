@@ -8,6 +8,7 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -46,7 +47,6 @@ class SummaryViewModel @Inject constructor(
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun SummaryBody(summaryViewModel: SummaryViewModel = hiltViewModel(), toAddItemScreen: (date: Int) -> Unit) {
-
     val calendarState = rememberCalendarViewState()
 
     val summary = summaryViewModel.summaryFlow?.collectAsState()
@@ -60,7 +60,11 @@ fun SummaryBody(summaryViewModel: SummaryViewModel = hiltViewModel(), toAddItemS
     var summaryFilterByRange by remember { mutableStateOf(DateRange(calendarState.currentDate)) }
     val bottomSheetScaffoldState = rememberBottomSheetScaffoldState()
 
-    BottomSheetScaffold(topBar = { TopAppBar(title = { Text("家計簿 β") }) }, floatingActionButton = {
+    BottomSheetScaffold( topBar = { TopAppBar(title = { Text("かけいぼ") }, actions = {
+        IconButton({}){
+            Icon(Icons.Default.Settings,null)
+        }
+    }) },floatingActionButton = {
 
 
         Column {

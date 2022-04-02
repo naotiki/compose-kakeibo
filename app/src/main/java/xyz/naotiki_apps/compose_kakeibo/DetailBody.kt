@@ -5,7 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -25,7 +25,6 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted.Companion.WhileSubscribed
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import xyz.naotiki_apps.compose_kakeibo.Category.Companion.parseAllCategoriesWithChildren
@@ -34,9 +33,8 @@ import javax.inject.Inject
 @HiltViewModel
 class DetailViewModel @Inject constructor(
     private val categoryRepository: CategoryRepository,
-    private val itemDataRepository: ItemDataRepository
+    private val itemDataRepository: ItemDataRepository,
 ) : ViewModel() {
-
     var allCategories = mutableStateOf<List<Category>?>(null)
 
     init {
@@ -48,16 +46,17 @@ class DetailViewModel @Inject constructor(
                 allCategories.value = it
             }
         }
-
     }
 
-    fun generateCategoryIcon(itemData: ItemData): Triple<IconText?, ColorData?, String> {
+    fun generateCategoryIcon(itemData: ItemData): CategoryData {
         val category = allCategories.value.orEmpty().firstOrNull { it.id == itemData.categoryId }
         val parentCategory = allCategories.value.orEmpty().firstOrNull { category?.parentId == it.id }
         val iconText = category?.iconText ?: parentCategory?.iconText
         val color = category?.color ?: parentCategory?.color
-        return Triple(iconText, color, parentCategory?.name?.let { "$it > " }.orEmpty() + category?.name)
-
+        return Triple(iconText,
+            color,
+            parentCategory?.name?.let { "$it > " }.orEmpty() + category?.name
+        )
     }
 
     fun removeItemData(itemDataList: List<ItemData>) = itemDataRepository.removeItemData(itemDataList)
@@ -69,7 +68,7 @@ class DetailViewModel @Inject constructor(
         sort: ItemDataSort,
         isDescending: Boolean,
         searchText: String,
-        categoryIds: List<Int>
+        categoryIds: List<Int>,
     ) {
         itemDataFlow = itemDataRepository.getItemData(dateRange, categoryIds, sort, isDescending, searchText).stateIn(
             viewModelScope,
@@ -117,185 +116,183 @@ fun DetailBody(detailViewModel: DetailViewModel = hiltViewModel()) {
             Text("${selectedItemDataList.size}件のデータを削除します。")
         })
     }
-    Scaffold(scaffoldState = scaffoldState, topBar = {
-        TopAppBar(title = { if (!editMode) Text("詳細") else Text("${selectedItemDataList.size}個選択中") },
-            navigationIcon =
 
-            if (editMode) {
-                {
-                    IconButton({ editMode = false }) {
-                        Icon(Icons.Default.ArrowBack, null)
-                    }
+
+    Column(Modifier.fillMaxSize()) {
+        TopAppBar(title = { Text( if (!editMode) "詳細" else "${selectedItemDataList.size}個選択中") }, navigationIcon = if (editMode) {
+            {
+                IconButton({ editMode = false }) {
+                    Icon(Icons.Default.ArrowBack, null)
                 }
-            } else null,
-            actions = {
-                if (!editMode) {
-                    IconButton({ editMode = true }) {
-                        Icon(Icons.Default.Edit, null)
+            }
+        } else null, actions = {
+            if (!editMode) {
+                IconButton({ editMode = true }) {
+                    Icon(Icons.Default.Edit, null)
+                }
+            } else {
+                var expanded by remember { mutableStateOf(false) }
+                IconButton({ expanded = selectedItemDataList.isNotEmpty() }) {
+                    Icon(Icons.Default.Category, null)
+                }
+                CategoriesDropDown(expanded, { expanded = false }, categories.orEmpty()) { category: Category ->
+                    expanded = false
+                    selectedItemDataList.forEach {
+                        it.categoryId = category.id
                     }
-                } else {
-                    var expanded by remember { mutableStateOf(false) }
-                    IconButton({ expanded = selectedItemDataList.isNotEmpty() }) {
-                        Icon(Icons.Default.Category, null)
-                    }
-                    CategoriesDropDown(expanded, { expanded = false }, categories.orEmpty()) { category: Category ->
-                        expanded = false
-                        selectedItemDataList.forEach {
-                            it.categoryId = category.id
-                        }
-                        ioThread {
-                            detailViewModel.updateItemData(selectedItemDataList)
-                            selectedItemDataList.clear()
-                        }
-                    }
-
-                    IconButton({
-                        deleteDialog = selectedItemDataList.isNotEmpty()
-                    }) {
-                        Icon(Icons.Default.Delete, null)
+                    ioThread {
+                        detailViewModel.updateItemData(selectedItemDataList)
+                        selectedItemDataList.clear()
                     }
                 }
 
-            })
-    }) { paddingValues ->
-        Column(Modifier.fillMaxSize().padding(paddingValues)) {
-            var searchText by remember { mutableStateOf("") }
-            TextField(
-                searchText,
-                { searchText = it },
-                singleLine = true,
-                label = { Text("検索") },
-                leadingIcon = { Icon(Icons.Default.Search, null) })
-
-            val selectedCategoryIds = remember { mutableStateListOf<Int>() }
-            var sortWay by remember { mutableStateOf(ItemDataSort.Date) }
-            var isDescending by remember { mutableStateOf(false) }
-            Row {
-                var expandedCategory by remember { mutableStateOf(false) }
-                OutlinedButton({ expandedCategory = true }) {
-                    Icon(if (selectedCategoryIds.isEmpty()) Icons.Outlined.Category else Icons.Filled.Category, null)
-                    Text("カテゴリー")
+                IconButton({
+                    deleteDialog = selectedItemDataList.isNotEmpty()
+                }) {
+                    Icon(Icons.Default.Delete, null)
                 }
-                DropdownMenu(expandedCategory, { expandedCategory = false }) {
-                    categories.orEmpty().parseAllCategoriesWithChildren().forEach { (parent, children) ->
-                        val hasChildren = children != null
-                        val triState = children?.run {
-                            if (selectedCategoryIds.containsAll(children.map { it.id })) ToggleableState.On
-                            else if (selectedCategoryIds.any { it in children.map { c -> c.id } }) ToggleableState.Indeterminate
-                            else ToggleableState.Off
-                        }
-                        DropdownMenuItem({
-                            if (hasChildren) {
-                                if (triState != ToggleableState.On) selectedCategoryIds.addAsSet(children!!.map { it.id })
-                                else selectedCategoryIds.removeAll(children.map { it.id })
-                            } else {
-                                if (selectedCategoryIds.contains(parent.id)) {
-                                    selectedCategoryIds.remove(parent.id)
-                                } else {
-                                    selectedCategoryIds.addAsSet(parent.id)
-                                }
-                            }
-                        }) {
-                            if (hasChildren) {
+            }
 
-                                TriStateCheckbox(triState!!, {
-                                    if (triState != ToggleableState.On) selectedCategoryIds.addAsSet(children.map { it.id })
-                                    else selectedCategoryIds.removeAll(children.map { it.id })
-                                })
-                            } else {
-                                Checkbox(selectedCategoryIds.contains(parent.id), {
-                                    if (!it)
-                                        selectedCategoryIds.remove(parent.id)
-                                    else selectedCategoryIds.addAsSet(parent.id)
-                                })
-                            }
+        })
+        var searchText by remember { mutableStateOf("") }
+        TextField(
+            searchText,
+            { searchText = it },
+            singleLine = true,
+            label = { Text("検索") },
+            leadingIcon = { Icon(Icons.Default.Search, null) })
 
-                            Text(parent.name)
-                        }
+        val selectedCategoryIds = remember { mutableStateListOf<Int>() }
+        var sortWay by remember { mutableStateOf(ItemDataSort.Date) }
+        var isDescending by remember { mutableStateOf(false) }
+        Row {
+            var expandedCategory by remember { mutableStateOf(false) }
+            OutlinedButton({ expandedCategory = true }) {
+                Icon(if (selectedCategoryIds.isEmpty()) Icons.Outlined.Category else Icons.Filled.Category, null)
+                Text("カテゴリー")
+            }
+            DropdownMenu(expandedCategory, { expandedCategory = false }) {
+                categories.orEmpty().parseAllCategoriesWithChildren().forEach { (parent, children) ->
+                    val hasChildren = children != null
+                    val triState = children?.run {
+                        if (selectedCategoryIds.containsAll(children.map { it.id })) ToggleableState.On
+                        else if (selectedCategoryIds.any { it in children.map { c -> c.id } }) ToggleableState.Indeterminate
+                        else ToggleableState.Off
+                    }
+                    DropdownMenuItem({
                         if (hasChildren) {
-                            Divider()
-                            children?.forEach { child ->
-                                DropdownMenuItem({
-                                    if (selectedCategoryIds.contains(child.id))
+                            if (triState != ToggleableState.On) selectedCategoryIds.addAsSet(children!!.map { it.id })
+                            else selectedCategoryIds.removeAll(children.map { it.id })
+                        } else {
+                            if (selectedCategoryIds.contains(parent.id)) {
+                                selectedCategoryIds.remove(parent.id)
+                            } else {
+                                selectedCategoryIds.addAsSet(parent.id)
+                            }
+                        }
+                    }) {
+                        if (hasChildren) {
+
+                            TriStateCheckbox(triState!!, {
+                                if (triState != ToggleableState.On) selectedCategoryIds.addAsSet(children.map { it.id })
+                                else selectedCategoryIds.removeAll(children.map { it.id })
+                            })
+                        } else {
+                            Checkbox(selectedCategoryIds.contains(parent.id), {
+                                if (!it)
+                                    selectedCategoryIds.remove(parent.id)
+                                else selectedCategoryIds.addAsSet(parent.id)
+                            })
+                        }
+
+                        Text(parent.name)
+                    }
+                    if (hasChildren) {
+                        Divider()
+                        children?.forEach { child ->
+                            DropdownMenuItem({
+                                if (selectedCategoryIds.contains(child.id))
+                                    selectedCategoryIds.remove(child.id)
+                                else selectedCategoryIds.addAsSet(child.id)
+                            }) {
+                                Spacer(Modifier.width(10.dp))
+                                Checkbox(selectedCategoryIds.contains(child.id), {
+                                    if (!it)
                                         selectedCategoryIds.remove(child.id)
                                     else selectedCategoryIds.addAsSet(child.id)
-                                }) {
-                                    Spacer(Modifier.width(10.dp))
-                                    Checkbox(selectedCategoryIds.contains(child.id), {
-                                        if (!it)
-                                            selectedCategoryIds.remove(child.id)
-                                        else selectedCategoryIds.addAsSet(child.id)
-                                    })
-                                    Text(child.name)
-                                }
+                                })
+                                Text(child.name)
                             }
-                            Divider()
                         }
+                        Divider()
                     }
                 }
+            }
 
-                var expandedSort by remember { mutableStateOf(false) }
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedButton({
-                            expandedSort = true
-                        }) {
-                            Icon(Icons.Default.Sort, null)
-                            Text(sortWay.sortName)
-                        }
-                        Text(if (isDescending) "${sortWay.sortExample.second}→${sortWay.sortExample.first}" else "${sortWay.sortExample.first}→${sortWay.sortExample.second}")
-                        Switch(isDescending, { isDescending = it })
+            var expandedSort by remember { mutableStateOf(false) }
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton({
+                        expandedSort = true
+                    }) {
+                        Icon(Icons.Default.Sort, null)
+                        Text(sortWay.sortName)
                     }
-                    DropdownMenu(expandedSort, { expandedSort = false }) {
-                        ItemDataSort.values().forEach {
-                            DropdownMenuItem({ sortWay = it;expandedSort = false }) {
-                                Text(it.sortName)
-                            }
-                        }
-                    }
+                    Text(if (isDescending) "${sortWay.sortExample.second}→${sortWay.sortExample.first}" else "${sortWay.sortExample.first}→${sortWay.sortExample.second}")
+                    Switch(isDescending, { isDescending = it })
                 }
-            }
-            val itemDataList = detailViewModel.itemDataFlow?.collectAsState()
-            LaunchedEffect(searchText, sortWay, selectedCategoryIds.toList(), isDescending) {
-                detailViewModel.getItemData(
-                    DateRange(Date(2022, 3)),
-                    sortWay,
-                    isDescending,
-                    searchText,
-                    selectedCategoryIds
-                )
-            }
-            LazyColumn() {
-                items(itemDataList?.value.orEmpty(), { it.id }) { item ->
-                    val selected = item in selectedItemDataList
-                    Row(modifier = Modifier.clickable {
-                        if (selected) selectedItemDataList.remove(item)
-                        else selectedItemDataList.addAsSet(item)
-                    }, verticalAlignment = Alignment.CenterVertically) {
-                        if (editMode) Checkbox(selected, { v ->
-                            if (!v) selectedItemDataList.remove(item)
-                            else selectedItemDataList.addAsSet(item)
-                        })
-                        ItemDataElement(item, detailViewModel.generateCategoryIcon(item))
+                DropdownMenu(expandedSort, { expandedSort = false }) {
+                    ItemDataSort.values().forEach {
+                        DropdownMenuItem({ sortWay = it;expandedSort = false }) {
+                            Text(it.sortName)
+                        }
                     }
-                    Divider()
                 }
             }
         }
+        val itemDataList = detailViewModel.itemDataFlow?.collectAsState()
+        LaunchedEffect(searchText, sortWay, selectedCategoryIds.toList(), isDescending) {
+            detailViewModel.getItemData(
+                DateRange(Date(2022, 3)),
+                sortWay,
+                isDescending,
+                searchText,
+                selectedCategoryIds
+            )
+        }
+        LazyColumn() {
+            items(itemDataList?.value.orEmpty(), { it.id }) { item ->
+                val selected = item in selectedItemDataList
+                Row(modifier = Modifier.clickable {
+                    if (selected) selectedItemDataList.remove(item)
+                    else selectedItemDataList.addAsSet(item)
+                }, verticalAlignment = Alignment.CenterVertically) {
+                    if (editMode) Checkbox(selected, { v ->
+                        if (!v) selectedItemDataList.remove(item)
+                        else selectedItemDataList.addAsSet(item)
+                    })
+                    ItemDataElement(item, detailViewModel.generateCategoryIcon(item))
+                }
+                Divider()
+            }
+        }
     }
+
 }
 
+typealias CategoryData = Triple<IconText?, ColorData?, String>
 
 @Composable
-fun ItemDataElement(itemData: ItemData, categoryIcon: Triple<IconText?, ColorData?, String>) {
+fun ItemDataElement(itemData: ItemData, categoryIcon: CategoryData) {
 
     Column(Modifier.padding(5.dp).fillMaxWidth()) {
         Row(
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.height(IntrinsicSize.Min),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
 
-            CategoriesIcon(categoryIcon.first, categoryIcon.second?.toColor() ?: Color.LightGray)
-            Spacer(Modifier.width(2.dp))
+            CategoryIcon(categoryIcon.first, categoryIcon.second)
+            Spacer(Modifier.width(5.dp))
             Text(categoryIcon.third, color = Color.Gray, style = MaterialTheme.typography.h6)
         }
         Text(itemData.name, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.h5)
@@ -309,14 +306,17 @@ fun ItemDataElement(itemData: ItemData, categoryIcon: Triple<IconText?, ColorDat
 }
 
 @Composable
-fun CategoriesIcon(text: IconText? = null, color: Color = Color.LightGray) {
-    Box(modifier = Modifier.background(color, RoundedCornerShape(50))) {
-        if (text != null) {
-            Text(
-                text.iconText,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.align(Alignment.Center).padding(5.dp),
-            )
+fun CategoryIcon(text: IconText? = null, colorData: ColorData?) {
+    val color = colorData?.toColor() ?: Color.Transparent
+    if (text != null || color != Color.Transparent) {
+        Box(modifier = Modifier.fillMaxHeight().background(color, CircleShape)) {
+            if (text?.iconText != null)
+                Text(
+                    text.iconText,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.align(Alignment.Center).padding(horizontal = 5.dp),
+                )
+            else Spacer(Modifier.width(8.dp))
         }
     }
 }
@@ -326,7 +326,7 @@ fun CategoriesDropDown(
     expanded: Boolean,
     onDismiss: () -> Unit,
     categories: List<Category>,
-    onSelected: (category: Category) -> Unit
+    onSelected: (category: Category) -> Unit,
 ) {
     val categoriesWithChildren = categories.parseAllCategoriesWithChildren()
     val currentOnSelected by rememberUpdatedState(onSelected)
@@ -353,9 +353,6 @@ fun CategoriesDropDown(
                     Text(parent.name)
                 }
             }
-
         }
-
     }
-
 }

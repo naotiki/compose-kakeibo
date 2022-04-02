@@ -17,31 +17,40 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
-
-
 enum class Direction(val value: Int) {
     Previous(-1),
     Next(1)
 }
-
 class LoopPagerState {
-    var hasOrder by mutableStateOf(false)
+   var hasOrder by mutableStateOf(false)
     var orderDirection: Direction? by mutableStateOf(null)
     fun animateTo(direction: Direction) {
         hasOrder = true
         orderDirection = direction
     }
 }
-
 @Composable
 fun rememberLoopPagerState() = remember { LoopPagerState() }
 
+/*
+ * RecyclerView使ったら簡単にできた説・・・
+ * ただやりたいことができなかったのでこれを一から作った
+ * */
+//英語でコメント書くと英作文力つきそうだよね
 /**
- * LoopPagerは横方向の表示をループします。*/
-/* これ作るのじかんかかった
- * すごくね？
- * RecyclerView使ったら簡単にできた説・・・*/
-
+ * LoopPager will show the screen with horizontal loop.
+ * Draw current,previous and next screen.
+ * If you need to run the task consuming more resource in this pager,
+ * you should run the task inside [current] composable.
+ * @param onChanged Be called before position reset
+ * and take the arg what direction loopPager will switch.
+ * @param previous Previous screen.
+ * @param current Current screen.
+ * @param next Next Screen.
+ * @param threshold If drag amount is more than threshold, screen will switch.
+ * If not, screen will back to original position with animations.
+ * (Default value is 150F)
+ * */
 @Composable
 fun LoopPager(
     state: LoopPagerState = rememberLoopPagerState(),
@@ -54,35 +63,42 @@ fun LoopPager(
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val sizePx = with(LocalDensity.current) { screenWidth.toPx() }
     val coroutineScope = rememberCoroutineScope()
-    val offsetX = remember { mutableStateOf(0f) }
+    val dragX = remember { mutableStateOf(0f) }
     var onDragging: Boolean by remember {
         mutableStateOf(false)
     }
-    val animatable = remember(offsetX.value) { Animatable(offsetX.value) }
+    //For 指
+    val animatable = remember(dragX.value) { Animatable(dragX.value) }
+    //For コード操作
     val animatableForState = remember(state.hasOrder) { Animatable(0F) }
-    if ((offsetX.value >= sizePx) && onDragging && !animatable.isRunning) {
+    //端に到達したら即画面更新
+    if ((dragX.value >= sizePx) && onDragging && !animatable.isRunning) {
         onChanged(Direction.Previous)
-        offsetX.value = 0F
-    } else if ((offsetX.value <= -sizePx) && onDragging && !animatable.isRunning) {
+        dragX.value = 0F
+    } else if ((dragX.value <= -sizePx) && onDragging && !animatable.isRunning) {
         onChanged(Direction.Next)
-        offsetX.value = 0F
+        dragX.value = 0F
     }
-    val float = if (abs(offsetX.value) > threshold && offsetX.value != 0F && (!onDragging || animatable.isRunning)) {
+
+
+                //よーするにドラッグ途中で離した時のやつー
+    val float = if ((abs(dragX.value) > threshold) && (dragX.value != 0F) && (!onDragging || animatable.isRunning)) {
         if (!animatable.isRunning) {
             coroutineScope.launch {
-                if (!animatable.isRunning && offsetX.value != 0F) {
+                if (!animatable.isRunning && dragX.value != 0F) {
                     val direction =
-                        if (offsetX.value > 0) Direction.Previous else if (offsetX.value < 0) Direction.Next else throw InternalError()
+                        if (dragX.value > 0) Direction.Previous else if (dragX.value < 0) Direction.Next else throw InternalError()
                     animatable.animateTo(
                         direction.value * sizePx * -1,
                         animationSpec = tween(150, easing = LinearEasing)
                     )
                     onChanged(direction)
-                    offsetX.value = 0F
+                    dragX.value = 0F
                 }
             }
         }
         remember { animatable.asState() }
+        //コード操作
     } else if (state.hasOrder && (!onDragging || animatableForState.isRunning)) {
         if (!animatableForState.isRunning) {
             coroutineScope.launch {
@@ -93,35 +109,37 @@ fun LoopPager(
                         animationSpec = tween(100, easing = LinearEasing)
                     )
                     onChanged(direction)
-                    offsetX.value = 0F
+                    dragX.value = 0F
                     state.hasOrder = false
                     state.orderDirection = null
                 }
             }
         }
         remember { animatableForState.asState() }
-    } else if (abs(offsetX.value) <= threshold && offsetX.value != 0F && (!onDragging || animatable.isRunning)) {
+        //閾値に満たない
+    } else if ((abs(dragX.value) <= threshold) && (dragX.value != 0F) && (!onDragging || animatable.isRunning)) {
         if (!animatable.isRunning) {
             coroutineScope.launch {
                 animatable.animateTo(0F, animationSpec = tween(250, easing = LinearEasing))
-                offsetX.value = 0F
+                dragX.value = 0F
             }
         }
         remember { animatable.asState() }
     } else {
         state.hasOrder = false
         state.orderDirection = null
-        offsetX
+        dragX
     }
+
     Row(Modifier.requiredWidth(screenWidth * 3).pointerInput(Unit) {
         detectHorizontalDragGestures(onDragStart = {
             onDragging = true
         }, onDragEnd = {
             onDragging = false
         }) { _, dragAmount ->
-            val originalX = offsetX.value
+            val originalX = dragX.value
             val newValue = (originalX + dragAmount).coerceIn(-sizePx..sizePx)
-            offsetX.value = newValue
+            dragX.value = newValue
         }
     }.offset { IntOffset(float.value.roundToInt(), 0) }) {
         previous()

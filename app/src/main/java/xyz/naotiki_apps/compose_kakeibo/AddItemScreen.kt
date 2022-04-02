@@ -49,7 +49,6 @@ class AddItemViewModel @Inject constructor(
     private val itemDataRepository: ItemDataRepository,
     private val categoryRepository: CategoryRepository
 ) : AndroidViewModel(application as Application) {
-
     val allCategories=categoryRepository.getAllCategories().asLiveData().distinctUntilChanged()
     private val speechRecognizer: SpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(application).also {
         it.setRecognitionListener(object : RecognitionListener {
@@ -67,12 +66,16 @@ class AddItemViewModel @Inject constructor(
                 speechState = SpeechState.Error
                 Toast.makeText(application, errorCodeToMessage(errorCode), Toast.LENGTH_LONG).show()
             }
-
             override fun onResults(results: Bundle) {
+                val scores=results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
                 val recData = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                if (recData != null) {
-                    var speechResult = recData[0]
-                    speechResult = speechResult.replace("万", "0000")
+                if (recData != null&&scores!=null) {
+
+                   var marged= mutableMapOf(*recData.mapIndexed { index, s ->
+                       s to scores[index]
+                   }.toTypedArray())
+                    Log.i("TAG", "onResults: $marged")
+                    val speechResult = recData.first()
 
 
                     hearText = speechResult
@@ -87,7 +90,7 @@ class AddItemViewModel @Inject constructor(
                 speechState = SpeechState.Knowing
                 val recData = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 if (recData != null) {
-                    hearText = recData[0]
+                    hearText = recData.first()
                 }
             }
 
@@ -128,6 +131,7 @@ class AddItemViewModel @Inject constructor(
     fun startSpeech() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS,3)
         }
         speechRecognizer.startListening(intent)
     }
