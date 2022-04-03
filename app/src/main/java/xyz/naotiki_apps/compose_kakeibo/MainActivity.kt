@@ -1,7 +1,6 @@
 package xyz.naotiki_apps.compose_kakeibo
 
 
-import android.content.Context
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -38,8 +37,17 @@ class MainActivity : AppCompatActivity() {
     val mainViewModel by viewModels<MainViewModel>()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        SettingsManager.init(getSharedPreferences(SHARED_PREFERENCES_SETTINGS, Context.MODE_PRIVATE)!!)
         DateStringFormatter.init(FormatType.Char)
+        //SettingsManager.getInstance()
+         val settings = arrayOf(OmitYen,ExportPath,Splitter)
+        val sharedPreferences=getSharedPreferences(SHARED_PREFERENCES_SETTINGS, MODE_PRIVATE)
+        sharedPreferences.registerOnSharedPreferenceChangeListener { preferences, key ->
+            settings.first { it.key==key }.read(preferences)
+        }
+        //When call read(),Settings.state.value initialize to the latest value
+        settings.forEach {
+            it.read(sharedPreferences)
+        }
         setContent {
             Compose_kakeiboTheme {
                 Surface(color = MaterialTheme.colors.background) {
@@ -59,7 +67,7 @@ class MainActivity : AppCompatActivity() {
                             }, icon = { Icon(Icons.Default.ViewList, null) }, label = { Text("詳細") })
                         }
                     }) {
-                        NavHost(navController, KakeiboScreen.SettingsScreen.name, Modifier.padding(it)) {
+                        NavHost(navController, KakeiboScreen.CategorySettings.name, Modifier.padding(it)) {
                             buildGraph { route: String ->
                                 if (route == NAVIGATE_TO_BACK)
                                     navController.popBackStack()

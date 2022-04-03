@@ -1,8 +1,5 @@
 package xyz.naotiki_apps.compose_kakeibo
 
-import androidx.annotation.ColorInt
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 import xyz.naotiki_apps.compose_kakeibo.Category.Companion.sortById
@@ -19,9 +16,7 @@ data class Category(
     var parentId: Int? = null,
 
     var color: ColorData? = null,
-    var iconText: IconText?=null
-
-
+    var iconText: String=""
 ) {
     /*fun getColor(): androidx.compose.ui.graphicsColor? {
 
@@ -109,18 +104,5 @@ interface CategoryDao {
 
 }
 
-data class ColorData(@ColorInt var colorInt: Int) {
-    fun toColor(): Color {
-        return Color(colorInt)
-    }
-    companion object {
-        fun Color.toColorData() = ColorData(this.toArgb())
-    }
-}
 
-//一文字だけ
-data class IconText(var iconText: String) {
-    init {
-        iconText = iconText.firstLetter()
-    }
-}
+

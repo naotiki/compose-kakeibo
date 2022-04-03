@@ -14,15 +14,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Color.Companion.Blue
-import androidx.compose.ui.graphics.Color.Companion.Cyan
+import androidx.compose.ui.graphics.Color.Companion.Black
 import androidx.compose.ui.graphics.Color.Companion.Gray
-import androidx.compose.ui.graphics.Color.Companion.Green
 import androidx.compose.ui.graphics.Color.Companion.LightGray
-import androidx.compose.ui.graphics.Color.Companion.Magenta
-import androidx.compose.ui.graphics.Color.Companion.Red
 import androidx.compose.ui.graphics.Color.Companion.Transparent
-import androidx.compose.ui.graphics.Color.Companion.Yellow
+import androidx.compose.ui.graphics.Color.Companion.Unspecified
+import androidx.compose.ui.graphics.Color.Companion.White
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -86,7 +83,7 @@ fun CategorySettingsBody(categorySettingsViewModel: CategorySettingsViewModel = 
                 ) {
                     CategoryIcon(parent.iconText, parent.color)
                     Spacer(Modifier.width(5.dp))
-                    Text(parent.name, style = MaterialTheme.typography.h6)
+                    Text(parent.name, style = MaterialTheme.typography.h6, color = if (selectedCategory==parent) Black else Unspecified)
                 }
                 if (hasChildren) {
                     Divider()
@@ -101,7 +98,7 @@ fun CategorySettingsBody(categorySettingsViewModel: CategorySettingsViewModel = 
                         ) {
                             Spacer(Modifier.width(20.dp))
                             CategoryIcon(child.iconText, child.color)
-                            Text(child.name, style = MaterialTheme.typography.h6)
+                            Text(child.name, style = MaterialTheme.typography.h6,color = if (selectedCategory==child) Black else Unspecified)
                         }
                     }
                     Divider()
@@ -142,11 +139,11 @@ fun CategorySettingsBody(categorySettingsViewModel: CategorySettingsViewModel = 
                                     ).clickable {
                                         selectedColor = color.toColorData()
                                     }) {
-                                    if (selectedColor?.colorInt == color.toArgb()) {
+                                    if (selectedColor?.colorInt == color.toArgb()){
                                         Box(
                                             modifier = Modifier.fillMaxSize().background(Color(0x3F000000), CircleShape)
                                         ) {
-                                            Icon(Icons.Default.Check, null, Modifier.align(Alignment.Center))
+                                            Icon(Icons.Default.Check, null, Modifier.align(Alignment.Center), tint = White)
                                         }
                                     }
                                 }
@@ -157,13 +154,10 @@ fun CategorySettingsBody(categorySettingsViewModel: CategorySettingsViewModel = 
                 }
 
                 Text("アイコンテキスト")
+                val emojiUtil=EmojiUtil.getInstance()
                 var iconText by remember(selectedCategory) { mutableStateOf(selectedCategory!!.iconText) }
-                TextField(iconText?.iconText ?: "", onValueChange = {
-                    if (it.codePoints().count() == 1L && it.isNotBlank()) {
-                        iconText = IconText(it)
-                    } else if (it.isEmpty()) {
-                        iconText = null
-                    }
+                TextField(iconText, onValueChange = {
+                    iconText = (if (emojiUtil.characterCount(it) <= 1 ) it else emojiUtil.firstCharacter(it))
                 }, placeholder = { Text("絵文字など一文字") }, singleLine = true)
 
                 Text("表示サンプル")
@@ -172,8 +166,8 @@ fun CategorySettingsBody(categorySettingsViewModel: CategorySettingsViewModel = 
                 ItemDataElement(
                     exampleItemData,
                     CategoryData(
-                        iconText ?: parentCategory?.iconText, selectedColor ?: parentCategory?.color,
-                        parentCategory?.name?.let { "$it > " }.orEmpty() + selectedCategory!!.name
+                        iconText.ifEmpty { parentCategory?.iconText }.orEmpty(), selectedColor ?: parentCategory?.color,
+                        parentCategory?.name?.let { "$it > " }.orEmpty() + name
                     )
                 )
                 //変更チェック
@@ -204,5 +198,4 @@ fun CategorySettingsBody(categorySettingsViewModel: CategorySettingsViewModel = 
 
 
 val exampleItemData = ItemData(name = "サンプルデータ", date = Date.getToday(), price = 110, categoryId = 0)
-val colors: List<Color> = listOf(Transparent, LightGray, Red, Magenta, Blue, Cyan, Green, Yellow)
 

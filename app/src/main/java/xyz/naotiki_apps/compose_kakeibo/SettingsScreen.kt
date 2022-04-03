@@ -12,6 +12,8 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,7 +61,12 @@ abstract class Settings<T>(val key: String, val defaultValue: T) {
         state.value = readFromPreferences(preferences)
     }
 
-    abstract fun write(preferences: SharedPreferences, value: T)
+    fun write(preferences: SharedPreferences, value: T){
+        writeToPreferences(preferences, value)
+        onUpdated(value)
+    }
+    open fun onUpdated(newValue:T){}
+    protected abstract fun writeToPreferences(preferences: SharedPreferences, value: T)
 
 
     open class EnumSettings<T : Enum<T>>(key: String, defaultValue: T) : Settings<Int>(key, defaultValue.ordinal) {
@@ -72,8 +79,11 @@ abstract class Settings<T>(val key: String, val defaultValue: T) {
         }
 
 
-        override fun write(preferences: SharedPreferences, value: Int) {
-            TODO("Not yet implemented")
+        override fun writeToPreferences(preferences: SharedPreferences, value: Int) {
+            with(preferences.edit()){
+                putInt(key,value)
+                apply()
+            }
         }
 
 
@@ -84,7 +94,7 @@ abstract class Settings<T>(val key: String, val defaultValue: T) {
             return preferences.getString(key, defaultValue)
         }
 
-        override fun write(preferences: SharedPreferences, value: String?) {
+        override fun writeToPreferences(preferences: SharedPreferences, value: String?) {
             with(preferences.edit()) {
                 putString(key, value)
                 apply()
@@ -98,7 +108,7 @@ abstract class Settings<T>(val key: String, val defaultValue: T) {
             return preferences.getBoolean(key, defaultValue)
         }
 
-        override fun write(preferences: SharedPreferences, value: Boolean) {
+        override fun writeToPreferences(preferences: SharedPreferences, value: Boolean) {
             with(preferences.edit()) {
                 putBoolean(key, value)
                 apply()
@@ -111,9 +121,6 @@ abstract class Settings<T>(val key: String, val defaultValue: T) {
 @Preview
 @Composable
 fun SettingsBody(settingsViewModel: SettingsViewModel = hiltViewModel()) {
-    LaunchedEffect(Unit) {
-
-    }
     Scaffold(topBar = {
         TopAppBar({ Text("設定") }, navigationIcon = {
             IconButton({
@@ -124,24 +131,8 @@ fun SettingsBody(settingsViewModel: SettingsViewModel = hiltViewModel()) {
         })
 
     }) { paddingValues: PaddingValues ->
-        val enable by remember { OmitYen.state }
         Column(Modifier.fillMaxSize().padding(paddingValues), Arrangement.spacedBy(5.dp)) {
-            SettingElement("「円」を省略", "音声認識時の「円」を言わなくてもいいようにします。") {
-                Switch(enable, onCheckedChange = { settingsViewModel.writeSetting(OmitYen, it) })
-            }
-
-
-
-            SettingElement("ライセンス", "") {
-                IconButton({
-                    TODO("Navigate to License Screen")
-                }) {
-                    Icon(Icons.Default.ArrowForward, null)
-                }
-            }
-
             val exportPath by remember { ExportPath.state }
-
             val l = rememberLauncherForActivityResult(
                 ActivityResultContracts.OpenDocumentTree(),
                 settingsViewModel::setExportPath
@@ -154,6 +145,34 @@ fun SettingsBody(settingsViewModel: SettingsViewModel = hiltViewModel()) {
                     l.launch(path)
                 }) {
                     Text("保存場所を変更")
+                }
+            }
+
+            val enable by remember { OmitYen.state }
+            SettingElement("「円」を省略", "音声認識時の「円」を言わなくてもいいようにします。") {
+                Switch(enable, onCheckedChange = { settingsViewModel.writeSetting(OmitYen, it) })
+            }
+            val spliter by remember { Splitter.state }
+            var expanded by remember { mutableStateOf(false) }
+            SettingElement("日付形式","日付の表示形式を選択できます。"){
+                IconButton({expanded=true}){
+                    Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null)
+                    DropdownMenu(expanded,{expanded=false}){
+                        DropdownMenuItem({}){
+                            Text("")
+                        }
+                    }
+                }
+            }
+
+
+
+            Divider()
+            SettingElement("ライセンス", "") {
+                IconButton({
+                    TODO("Navigate to License Screen")
+                }) {
+                    Icon(Icons.Default.ArrowForward, null)
                 }
             }
         }

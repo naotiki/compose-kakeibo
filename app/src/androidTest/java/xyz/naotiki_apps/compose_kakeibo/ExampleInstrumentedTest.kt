@@ -1,13 +1,11 @@
 package xyz.naotiki_apps.compose_kakeibo
 
-import androidx.compose.ui.graphics.Color
-import androidx.test.platform.app.InstrumentationRegistry
+import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
-
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-
-import org.junit.Assert.*
 
 /**
  * Instrumented test, which will execute on an Android device.
@@ -16,14 +14,30 @@ import org.junit.Assert.*
  */
 @RunWith(AndroidJUnit4::class)
 class ExampleInstrumentedTest {
+    lateinit var emojiUtil:EmojiUtil
+    @Before
+    fun initialize(){
+        emojiUtil= EmojiUtil.getInstance()
+    }
     @Test
     fun useAppContext() {
-        // Context of the app under test.
-        val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("xyz.naotiki_apps.compose_kakeibo", appContext.packageName)
+        //Error Log.i("EMOJI",emojiUtil.firstCharacter(""))
+        Log.i("EMOJI",emojiUtil.firstCharacter("あ"))
+        Log.i("EMOJI",emojiUtil.firstCharacter("あいうえお"))
+        Log.i("EMOJI",emojiUtil.firstCharacter("\uD83D\uDC68\u200D\uD83D\uDC68\u200D\uD83D\uDC66"))
+        Log.i("EMOJI",emojiUtil.firstCharacter("\uD83D\uDC68\u200D\uD83D\uDC68\u200D\uD83D\uDC66あ"))
 
 
-        /* val db=AppDatabase.getDatabase(appContext)
-        db.categoryDao().insertAll(Category(name = "肉", color = Color.Red))*/
+
+        Log.i("EMOJI", emojiUtil.characterCount("").toString())
+        Log.i("EMOJI", emojiUtil.characterCount("あ").toString())
+        Log.i("EMOJI", emojiUtil.characterCount("あいうえお").toString())
+        Log.i("EMOJI", emojiUtil.characterCount("\uD83D\uDC68\u200D\uD83D\uDC68\u200D\uD83D\uDC66").toString())
+        Log.i("EMOJI", emojiUtil.characterCount("\uD83D\uDC68\u200D\uD83D\uDC68\u200D\uD83D\uDC66あいうえお").toString())
+
+    }
+    @After
+    fun a(){
+
     }
 }

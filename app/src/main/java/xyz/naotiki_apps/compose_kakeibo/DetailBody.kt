@@ -51,9 +51,10 @@ class DetailViewModel @Inject constructor(
     fun generateCategoryIcon(itemData: ItemData): CategoryData {
         val category = allCategories.value.orEmpty().firstOrNull { it.id == itemData.categoryId }
         val parentCategory = allCategories.value.orEmpty().firstOrNull { category?.parentId == it.id }
-        val iconText = category?.iconText ?: parentCategory?.iconText
+        val iconText = category?.iconText?.ifEmpty { parentCategory?.iconText }.orEmpty()
         val color = category?.color ?: parentCategory?.color
-        return Triple(iconText,
+        return Triple(
+            iconText,
             color,
             parentCategory?.name?.let { "$it > " }.orEmpty() + category?.name
         )
@@ -119,41 +120,43 @@ fun DetailBody(detailViewModel: DetailViewModel = hiltViewModel()) {
 
 
     Column(Modifier.fillMaxSize()) {
-        TopAppBar(title = { Text( if (!editMode) "詳細" else "${selectedItemDataList.size}個選択中") }, navigationIcon = if (editMode) {
-            {
-                IconButton({ editMode = false }) {
-                    Icon(Icons.Default.ArrowBack, null)
-                }
-            }
-        } else null, actions = {
-            if (!editMode) {
-                IconButton({ editMode = true }) {
-                    Icon(Icons.Default.Edit, null)
-                }
-            } else {
-                var expanded by remember { mutableStateOf(false) }
-                IconButton({ expanded = selectedItemDataList.isNotEmpty() }) {
-                    Icon(Icons.Default.Category, null)
-                }
-                CategoriesDropDown(expanded, { expanded = false }, categories.orEmpty()) { category: Category ->
-                    expanded = false
-                    selectedItemDataList.forEach {
-                        it.categoryId = category.id
+        TopAppBar(title = { Text(if (!editMode) "詳細" else "${selectedItemDataList.size}個選択中") },
+            navigationIcon = if (editMode) {
+                {
+                    IconButton({ editMode = false }) {
+                        Icon(Icons.Default.ArrowBack, null)
                     }
-                    ioThread {
-                        detailViewModel.updateItemData(selectedItemDataList)
-                        selectedItemDataList.clear()
+                }
+            } else null,
+            actions = {
+                if (!editMode) {
+                    IconButton({ editMode = true }) {
+                        Icon(Icons.Default.Edit, null)
+                    }
+                } else {
+                    var expanded by remember { mutableStateOf(false) }
+                    IconButton({ expanded = selectedItemDataList.isNotEmpty() }) {
+                        Icon(Icons.Default.Category, null)
+                    }
+                    CategoriesDropDown(expanded, { expanded = false }, categories.orEmpty()) { category: Category ->
+                        expanded = false
+                        selectedItemDataList.forEach {
+                            it.categoryId = category.id
+                        }
+                        ioThread {
+                            detailViewModel.updateItemData(selectedItemDataList)
+                            selectedItemDataList.clear()
+                        }
+                    }
+
+                    IconButton({
+                        deleteDialog = selectedItemDataList.isNotEmpty()
+                    }) {
+                        Icon(Icons.Default.Delete, null)
                     }
                 }
 
-                IconButton({
-                    deleteDialog = selectedItemDataList.isNotEmpty()
-                }) {
-                    Icon(Icons.Default.Delete, null)
-                }
-            }
-
-        })
+            })
         var searchText by remember { mutableStateOf("") }
         TextField(
             searchText,
@@ -280,7 +283,7 @@ fun DetailBody(detailViewModel: DetailViewModel = hiltViewModel()) {
 
 }
 
-typealias CategoryData = Triple<IconText?, ColorData?, String>
+typealias CategoryData = Triple<String, ColorData?, String>
 
 @Composable
 fun ItemDataElement(itemData: ItemData, categoryIcon: CategoryData) {
@@ -305,18 +308,23 @@ fun ItemDataElement(itemData: ItemData, categoryIcon: CategoryData) {
 
 }
 
+
 @Composable
-fun CategoryIcon(text: IconText? = null, colorData: ColorData?) {
+fun CategoryIcon(text: String = "", colorData: ColorData?) {
     val color = colorData?.toColor() ?: Color.Transparent
-    if (text != null || color != Color.Transparent) {
+    val contentColor = color.generateContentColor()
+    if (text.isNotEmpty() || color != Color.Transparent) {
         Box(modifier = Modifier.fillMaxHeight().background(color, CircleShape)) {
-            if (text?.iconText != null)
-                Text(
-                    text.iconText,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.align(Alignment.Center).padding(horizontal = 5.dp),
-                )
-            else Spacer(Modifier.width(8.dp))
+            // Optimize "on"colors
+            CompositionLocalProvider(LocalContentColor provides contentColor) {
+                if (text.isNotEmpty())
+                    Text(
+                        text,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.align(Alignment.Center).padding(horizontal = 5.dp),
+                    )
+                else Spacer(Modifier.width(8.dp))
+            }
         }
     }
 }

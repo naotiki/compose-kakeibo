@@ -59,7 +59,7 @@ abstract class AppDatabase : RoomDatabase() {
     }
 }
 
-class Converters {
+object Converters {
     @TypeConverter
     fun toDate(value: Int): Date {
         Color.Red.toColorData()
@@ -80,13 +80,6 @@ class Converters {
         return color?.colorInt
     }
 
-    @TypeConverter
-    fun toIconText(value:String?): IconText?{
-        return value?.let { IconText(value) }
-    }
-    @TypeConverter
-    fun iconTextToString(iconText: IconText?):String?{
-        return iconText?.iconText
-    }
+
 
 }

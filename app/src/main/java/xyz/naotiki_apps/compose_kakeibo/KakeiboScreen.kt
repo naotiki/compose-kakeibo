@@ -8,7 +8,7 @@ import androidx.navigation.compose.composable
 typealias NavigateFunc = (route: String) -> Unit
 
 
-enum class KakeiboScreen(
+ enum class KakeiboScreen(
     val body: @Composable (NavBackStackEntry, toNavigate: NavigateFunc) -> Unit,
     private val args: List<NamedNavArgument>? = null
 ) {
@@ -31,7 +31,7 @@ enum class KakeiboScreen(
     }),
     CategorySettings({ _: NavBackStackEntry, _: NavigateFunc ->
         CategorySettingsBody()
-    });
+    }) ;
 
 
     companion object {

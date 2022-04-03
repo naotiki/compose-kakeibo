@@ -21,6 +21,10 @@ enum class Direction(val value: Int) {
     Previous(-1),
     Next(1)
 }
+/**
+ * The class for to operation loopPager from program
+ * @property hasOrder the boolean value is animating now or not
+ * */
 class LoopPagerState {
    var hasOrder by mutableStateOf(false)
     var orderDirection: Direction? by mutableStateOf(null)
@@ -38,10 +42,11 @@ fun rememberLoopPagerState() = remember { LoopPagerState() }
  * */
 //英語でコメント書くと英作文力つきそうだよね
 /**
- * LoopPager will show the screen with horizontal loop.
+ * "LoopPager" will show the screen with horizontal loop.
  * Draw current,previous and next screen.
  * If you need to run the task consuming more resource in this pager,
  * you should run the task inside [current] composable.
+ * @param
  * @param onChanged Be called before position reset
  * and take the arg what direction loopPager will switch.
  * @param previous Previous screen.
