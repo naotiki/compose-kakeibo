@@ -25,6 +25,10 @@ import androidx.lifecycle.AndroidViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import xyz.naotiki_apps.compose_kakeibo.EnumExtensions.Companion.toEnum
+import xyz.naotiki_apps.compose_kakeibo.Settings.ExportPath
+import xyz.naotiki_apps.compose_kakeibo.Settings.OmitYen
+import xyz.naotiki_apps.compose_kakeibo.Settings.Splitter
+
 import java.io.File
 import javax.inject.Inject
 
@@ -42,36 +46,39 @@ class SettingsViewModel @Inject constructor(
                     Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             contentResolver.takePersistableUriPermission(uri, takeFlags)
 
-            ExportPath.write(preferences, uri.path)
+            ExportPath.write( uri.path)
         }
     }
 
-    fun <T> writeSetting(s: Settings<T>, value: T) = s.write(preferences, value)
+    fun <T> writeSetting(s: SettingItem<T>, value: T) = s.write( value)
 
-    fun <T> readSettings(s: Settings<T>): T {
-        s.read(preferences)
+    fun <T> readSettings(s: SettingItem<T>): T {
+        s.read()
         return s.state.value
     }
 }
 
-abstract class Settings<T>(val key: String, val defaultValue: T) {
+abstract class SettingItem<T>(val key: String, val defaultValue: T) {
+    protected lateinit var sharedPreferences: SharedPreferences
+    fun init(sharedPreferences: SharedPreferences){
+        this.sharedPreferences=sharedPreferences
+    }
     var state = mutableStateOf(defaultValue)
-    protected abstract fun readFromPreferences(preferences: SharedPreferences): T
-    fun read(preferences: SharedPreferences) {
-        state.value = readFromPreferences(preferences)
+    protected abstract fun readFromPreferences(): T
+
+    fun read() {
+        state.value = readFromPreferences()
     }
 
-    fun write(preferences: SharedPreferences, value: T){
-        writeToPreferences(preferences, value)
-        onUpdated(value)
+    fun write( value: T){
+        writeToPreferences( value)
     }
-    open fun onUpdated(newValue:T){}
-    protected abstract fun writeToPreferences(preferences: SharedPreferences, value: T)
+    protected abstract fun writeToPreferences( value: T)
 
 
-    open class EnumSettings<T : Enum<T>>(key: String, defaultValue: T) : Settings<Int>(key, defaultValue.ordinal) {
-        override fun readFromPreferences(preferences: SharedPreferences): Int {
-            return preferences.getInt(key, defaultValue)
+    open class EnumSettingItem<T : Enum<T>>(key: String, defaultValue: T) : SettingItem<Int>(key, defaultValue.ordinal) {
+        override fun readFromPreferences(): Int {
+            return sharedPreferences.getInt(key, defaultValue)
         }
 
         inline fun <reified T : Enum<T>> castedValue(): T? {
@@ -79,8 +86,8 @@ abstract class Settings<T>(val key: String, val defaultValue: T) {
         }
 
 
-        override fun writeToPreferences(preferences: SharedPreferences, value: Int) {
-            with(preferences.edit()){
+        override fun writeToPreferences( value: Int) {
+            with(sharedPreferences.edit()){
                 putInt(key,value)
                 apply()
             }
@@ -89,27 +96,29 @@ abstract class Settings<T>(val key: String, val defaultValue: T) {
 
     }
 
-    open class StringSettings(key: String, defaultValue: String?) : Settings<String?>(key, defaultValue) {
-        override fun readFromPreferences(preferences: SharedPreferences): String? {
-            return preferences.getString(key, defaultValue)
+    open class StringSettingItem(key: String, defaultValue: String?) : SettingItem<String?>(key, defaultValue) {
+        override fun readFromPreferences(): String? {
+            return sharedPreferences.getString(key, defaultValue)
         }
 
-        override fun writeToPreferences(preferences: SharedPreferences, value: String?) {
-            with(preferences.edit()) {
+        override fun writeToPreferences( value: String?) {
+            with(sharedPreferences.edit()) {
                 putString(key, value)
                 apply()
             }
         }
 
+
+
     }
 
-    open class BooleanSettings(key: String, defaultValue: Boolean) : Settings<Boolean>(key, defaultValue) {
-        override fun readFromPreferences(preferences: SharedPreferences): Boolean {
-            return preferences.getBoolean(key, defaultValue)
+    open class BooleanSettingItem(key: String, defaultValue: Boolean) : SettingItem<Boolean>(key, defaultValue) {
+        override fun readFromPreferences(): Boolean {
+            return sharedPreferences.getBoolean(key, defaultValue)
         }
 
-        override fun writeToPreferences(preferences: SharedPreferences, value: Boolean) {
-            with(preferences.edit()) {
+        override fun writeToPreferences( value: Boolean) {
+            with(sharedPreferences.edit()) {
                 putBoolean(key, value)
                 apply()
             }

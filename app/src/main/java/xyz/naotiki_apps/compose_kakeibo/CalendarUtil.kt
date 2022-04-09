@@ -54,6 +54,7 @@ class DateRange : ClosedRange<Date> {
  * */
 @Parcelize
 data class Date(var year: Int, var month: Int, var day: Int = 1) : Comparable<Date>, Parcelable {
+
     //CalenderClass用 -1しただけよ
     val innerMonth get() = month - 1
     override fun toString() = DateStringFormatter.getInstance().dateToString(this)
@@ -87,6 +88,7 @@ data class Date(var year: Int, var month: Int, var day: Int = 1) : Comparable<Da
             val year = ((y12m - month) / 12)
             return Date(year, month + 1, day)
         }
+
         //ｴﾎﾟｯｸ
         //EpochタイムからDateをつくる
         fun dateFromLong(long: Long): Date {
@@ -112,8 +114,23 @@ data class Date(var year: Int, var month: Int, var day: Int = 1) : Comparable<Da
 
         }
     }
+
     operator fun rangeTo(b: Date): DateRange = DateRange(this, b)
     override fun compareTo(other: Date): Int = this.toInt().compareTo(other.toInt())
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as Date
+
+        if (year != other.year) return false
+        if (month != other.month) return false
+        if (day != other.day) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int = toInt()
 
 }
 
@@ -186,10 +203,9 @@ class CalendarUtil private constructor() {
         private val _calendar: Calendar = Calendar.getInstance(ULocale("ja_JP"))
         fun getCalender() = _calendar
 
-        @Volatile
-        private var instance = CalendarUtil()
+        val instance = CalendarUtil()
 
-         fun <T> dateScope(date: Date, block: CalendarUtil.() -> T) = with(instance.setDate(date), block)
+        inline fun <T> dateScope(date: Date, block: CalendarUtil.() -> T) = with(instance.setDate(date), block)
     }
 }
 

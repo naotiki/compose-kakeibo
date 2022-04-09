@@ -8,11 +8,16 @@ import xyz.naotiki_apps.compose_kakeibo.ItemDataSort.Companion.sortItemData
 
 class CategoryRepository(private val categoryDao: CategoryDao) {
     fun getAllCategories() = categoryDao.getAllCategory()
-    fun addCategories(vararg category: Category) {
-        ioThread {
-            categoryDao.insertAll(*category.sortById())
-        }
+    fun addCategories(vararg category: Category) = ioThread {
+        categoryDao.insertAll(*category.sortById())
     }
+    fun updateCategory(category: Category) = ioThread {
+        categoryDao.update(category)
+    }
+    fun deleteCategory(category: Category)= ioThread{
+        categoryDao.delete(category)
+    }
+
 }
 
 class ItemDataRepository(private val itemDataDao: ItemDataDao) {
@@ -22,6 +27,10 @@ class ItemDataRepository(private val itemDataDao: ItemDataDao) {
     /* fun getHasDataDay(dataRange: DateRange): Flow<List<Date>> =
          itemDataDao.getHasDataDaysFromDateRange(dataRange.minDate, dataRange.maxDate)*/
 
+    fun existsItemDataByCategory(category: Category): Boolean = ioThread {
+        itemDataDao.existHasCategory(category.id) != null
+    }
+
     fun insertItemData(vararg itemData: ItemData) {
         itemDataDao.insertAll(*itemData)
     }
@@ -30,6 +39,7 @@ class ItemDataRepository(private val itemDataDao: ItemDataDao) {
         itemDataDao.delete(*itemDataList.toTypedArray())
     }
 
+    //Build SQL sentence
     fun getItemData(
         dataRange: DateRange,
         filterCategoryIds: List<Int>,
@@ -37,7 +47,6 @@ class ItemDataRepository(private val itemDataDao: ItemDataDao) {
         isDescending: Boolean,
         searchText: String = ""
     ): Flow<List<ItemData>> {
-
         val d = "${dataRange.minDate.toInt()} <= date AND ${dataRange.maxDate.toInt()} >= date"
         val c =
             if (filterCategoryIds.isNotEmpty()) "and parent_category_id IN (${filterCategoryIds.toStringForSql()})" else ""
@@ -45,7 +54,8 @@ class ItemDataRepository(private val itemDataDao: ItemDataDao) {
         val q = SimpleSQLiteQuery("select * from item_data where $d $c $s")
         return itemDataDao.getItemDataViaQuery(q).map { it.sortItemData(sort, isDescending) }
     }
-    fun updateItemData( itemDataList: List<ItemData>){
+
+    fun updateItemData(itemDataList: List<ItemData>) {
         itemDataDao.update(*itemDataList.toTypedArray())
     }
 

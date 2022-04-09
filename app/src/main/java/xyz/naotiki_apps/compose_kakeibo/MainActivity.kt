@@ -23,12 +23,20 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import xyz.naotiki_apps.compose_kakeibo.DateStringFormatter.FormatType
 import xyz.naotiki_apps.compose_kakeibo.KakeiboScreen.Companion.NAVIGATE_TO_BACK
 import xyz.naotiki_apps.compose_kakeibo.KakeiboScreen.Companion.buildGraph
+import xyz.naotiki_apps.compose_kakeibo.Settings.ExportPath
+import xyz.naotiki_apps.compose_kakeibo.Settings.OmitYen
+import xyz.naotiki_apps.compose_kakeibo.Settings.Splitter
 import xyz.naotiki_apps.compose_kakeibo.ui.theme.Compose_kakeiboTheme
 import javax.inject.Inject
 
 //カテゴリFlowとかここに移したほうが・・・
 @HiltViewModel
 class MainViewModel @Inject constructor() : ViewModel() {
+    init {
+        //TODO なのであとでやる
+        //小泉構文
+        throw NotImplementedError()
+    }
 
 }
 
@@ -37,17 +45,10 @@ class MainActivity : AppCompatActivity() {
     val mainViewModel by viewModels<MainViewModel>()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        DateStringFormatter.init(FormatType.Char)
-        //SettingsManager.getInstance()
-         val settings = arrayOf(OmitYen,ExportPath,Splitter)
+
         val sharedPreferences=getSharedPreferences(SHARED_PREFERENCES_SETTINGS, MODE_PRIVATE)
-        sharedPreferences.registerOnSharedPreferenceChangeListener { preferences, key ->
-            settings.first { it.key==key }.read(preferences)
-        }
-        //When call read(),Settings.state.value initialize to the latest value
-        settings.forEach {
-            it.read(sharedPreferences)
-        }
+        Settings.init(sharedPreferences)
+        DateStringFormatter.init(Splitter.castedValue<FormatType>()!!)
         setContent {
             Compose_kakeiboTheme {
                 Surface(color = MaterialTheme.colors.background) {

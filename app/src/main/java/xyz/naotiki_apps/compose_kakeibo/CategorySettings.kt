@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Color.Companion.Black
 import androidx.compose.ui.graphics.Color.Companion.Gray
@@ -34,14 +36,14 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CategorySettingsViewModel @Inject constructor(
-    val categoryRepository: CategoryRepository,
+    private val categoryRepository: CategoryRepository,
+    private val itemDataRepository: ItemDataRepository
 ) : ViewModel() {
     val allCategories = categoryRepository.getAllCategories().stateIn(viewModelScope, WhileSubscribed(), emptyList())
-    fun updateCategory(category: Category) {
-    }
+    fun updateCategory(category: Category) = categoryRepository.updateCategory(category)
+    fun deleteCategory(category: Category)=categoryRepository.deleteCategory(category)
+    fun existsCategoryChildItemData(category: Category):Boolean=itemDataRepository.existsItemDataByCategory(category)
 }
-
-
 @Composable
 fun CategorySettingsBody(categorySettingsViewModel: CategorySettingsViewModel = hiltViewModel()) {
     val allCategories by categorySettingsViewModel.allCategories.collectAsState()
@@ -50,6 +52,32 @@ fun CategorySettingsBody(categorySettingsViewModel: CategorySettingsViewModel = 
     var selectedCategory by remember { mutableStateOf<Category?>(null) }
     var cache by remember { mutableStateOf<Category?>(null) }
     val hasCache = cache != null
+    //selectedCategoryは常に存在しているカテゴリにする
+    LaunchedEffect(allCategories){
+        selectedCategory?.also {
+            if (it !in allCategories) selectedCategory=null
+        }
+    }
+    var beforeDeleteAlert by remember { mutableStateOf(false) }
+    if (beforeDeleteAlert) {
+        AlertDialog({ beforeDeleteAlert = false }, confirmButton = {
+            Button({
+                beforeDeleteAlert = false
+                categorySettingsViewModel.deleteCategory(selectedCategory!!)
+                selectedCategory=null
+            }) {
+                Text("続行")
+            }
+        }, dismissButton = {
+            TextButton({ beforeDeleteAlert = false }) {
+                Text("キャンセル")
+            }
+        }, title = {
+            Text("このカテゴリーは使用されています")
+        }, text = {
+            Text("このカテゴリーに設定されていたアイテムはカテゴリーが未設定に変更されます。")
+        })
+    }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
         TopAppBar(title = {
             Text("カテゴリー")
@@ -83,7 +111,11 @@ fun CategorySettingsBody(categorySettingsViewModel: CategorySettingsViewModel = 
                 ) {
                     CategoryIcon(parent.iconText, parent.color)
                     Spacer(Modifier.width(5.dp))
-                    Text(parent.name, style = MaterialTheme.typography.h6, color = if (selectedCategory==parent) Black else Unspecified)
+                    Text(
+                        parent.name,
+                        style = MaterialTheme.typography.h6,
+                        color = if (selectedCategory == parent) Black else Unspecified
+                    )
                 }
                 if (hasChildren) {
                     Divider()
@@ -98,7 +130,11 @@ fun CategorySettingsBody(categorySettingsViewModel: CategorySettingsViewModel = 
                         ) {
                             Spacer(Modifier.width(20.dp))
                             CategoryIcon(child.iconText, child.color)
-                            Text(child.name, style = MaterialTheme.typography.h6,color = if (selectedCategory==child) Black else Unspecified)
+                            Text(
+                                child.name,
+                                style = MaterialTheme.typography.h6,
+                                color = if (selectedCategory == child) Black else Unspecified
+                            )
                         }
                     }
                     Divider()
@@ -139,11 +175,16 @@ fun CategorySettingsBody(categorySettingsViewModel: CategorySettingsViewModel = 
                                     ).clickable {
                                         selectedColor = color.toColorData()
                                     }) {
-                                    if (selectedColor?.colorInt == color.toArgb()){
+                                    if (selectedColor?.colorInt == color.toArgb()) {
                                         Box(
                                             modifier = Modifier.fillMaxSize().background(Color(0x3F000000), CircleShape)
                                         ) {
-                                            Icon(Icons.Default.Check, null, Modifier.align(Alignment.Center), tint = White)
+                                            Icon(
+                                                Icons.Default.Check,
+                                                null,
+                                                Modifier.align(Alignment.Center),
+                                                tint = White
+                                            )
                                         }
                                     }
                                 }
@@ -154,11 +195,23 @@ fun CategorySettingsBody(categorySettingsViewModel: CategorySettingsViewModel = 
                 }
 
                 Text("アイコンテキスト")
-                val emojiUtil=EmojiUtil.getInstance()
+                val emojiUtil = EmojiUtil.getInstance()
                 var iconText by remember(selectedCategory) { mutableStateOf(selectedCategory!!.iconText) }
-                TextField(iconText, onValueChange = {
-                    iconText = (if (emojiUtil.characterCount(it) <= 1 ) it else emojiUtil.firstCharacter(it))
-                }, placeholder = { Text("絵文字など一文字") }, singleLine = true)
+                val focusRequester = remember { FocusRequester() }
+                val emojiValidate = emojiUtil.characterCount(iconText) <= 1
+                TextField(
+                    iconText,
+                    modifier = Modifier.focusRequester(focusRequester),
+                    onValueChange = {
+                        iconText = it.also {
+                            if (emojiUtil.characterCount(it) <= 1) focusRequester.freeFocus() else focusRequester.captureFocus()
+                        }
+                    },
+                    label = { Text("アイコンテキスト(一文字以下)") },
+                    placeholder = { Text("絵文字など一文字(空でも可)") },
+                    singleLine = true,
+                    isError = !emojiValidate
+                )
 
                 Text("表示サンプル")
                 Text("色やアイコンを指定していなくても親カテゴリに指定されている場合は、親の色やアイコンが適用されます。", style = MaterialTheme.typography.caption)
@@ -185,11 +238,26 @@ fun CategorySettingsBody(categorySettingsViewModel: CategorySettingsViewModel = 
                     }
                 }
                 Button({
-                    TODO("保存")
+                    categorySettingsViewModel.updateCategory(cache!!)
+                    //ボタン押せなくしてやるぜ
+                    cache = null
                 }, enabled = hasCache, modifier = Modifier.align(Alignment.End)) {
                     Text("保存")
                 }
-            } else Text("カテゴリを選択してください")
+            } else {
+                Text("カテゴリを選択してください。", style = MaterialTheme.typography.h5)
+                Spacer(Modifier.height(15.dp))
+                Row {
+                    Text("右上の")
+                    Icon(Icons.Default.Add, null)
+                    Text("ボタンでカテゴリーを追加できます。")
+                }
+                Row {
+                    Text("右上の")
+                    Icon(Icons.Default.Remove, null)
+                    Text("ボタンでカテゴリーを削除できます。")
+                }
+            }
 
         }
     }

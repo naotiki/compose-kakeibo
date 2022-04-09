@@ -29,19 +29,16 @@ import xyz.naotiki_apps.compose_kakeibo.CalendarUtil.DayOfWeek
 import xyz.naotiki_apps.compose_kakeibo.DateRange.Companion.asOneDayDateRange
 import javax.inject.Inject
 
-//これSummaryVMでいいんじゃね？？->YES!!!!
 @HiltViewModel
 class SummaryViewModel @Inject constructor(
     private val itemDataRepository: ItemDataRepository
 ) : ViewModel() {
-    //StateFlow自体を状態にすることでFlowが変更されても対処
+    //StateFlow自体をStateにすることで元のFlowが変更されると再コンポーズされる
     var summaryFlow by mutableStateOf<StateFlow<List<ItemData>>?>(null)
     fun getSummary(dateRange: DateRange) {
         summaryFlow = itemDataRepository.getDaySummary(dateRange)
             .stateIn(viewModelScope, WhileSubscribed(1000), emptyList())
     }
-
-
 }
 
 @OptIn(ExperimentalMaterialApi::class)
@@ -50,10 +47,9 @@ fun SummaryBody(summaryViewModel: SummaryViewModel = hiltViewModel(), toAddItemS
     val calendarState = rememberCalendarViewState()
 
     val summary = summaryViewModel.summaryFlow?.collectAsState()
-    LaunchedEffect(true) {
+    LaunchedEffect(Unit) {
         summaryViewModel.getSummary(DateRange(calendarState.currentDate))
     }
-
     val scope = rememberCoroutineScope()
     val sheetScrollState = rememberScrollState()
 
@@ -135,10 +131,9 @@ fun SummaryBody(summaryViewModel: SummaryViewModel = hiltViewModel(), toAddItemS
 //TODO 概要円グラフの実装
 @Composable
 fun SummaryPieChart(itemDataList: List<ItemData>, categoryList: List<Category>) {
-
-    AndroidView({
+    TODO("まだできてねぇ")
+   /* AndroidView({
         PieChart(it).apply {
-            categoryList.map { it.id }
             setOnChartValueSelectedListener(object:OnChartValueSelectedListener{
                 override fun onValueSelected(e: Entry?, h: Highlight?) {
 
@@ -152,5 +147,5 @@ fun SummaryPieChart(itemDataList: List<ItemData>, categoryList: List<Category>) 
 
             itemDataList.forEach { }
         }
-    })
+    })*/
 }

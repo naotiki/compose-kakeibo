@@ -16,8 +16,9 @@ data class Category(
     var parentId: Int? = null,
 
     var color: ColorData? = null,
-    var iconText: String=""
+    var iconText: String = ""
 ) {
+
     /*fun getColor(): androidx.compose.ui.graphicsColor? {
 
         return color?.let { Color(it) }
@@ -88,8 +89,11 @@ interface CategoryDao {
     @Delete
     fun delete(category: Category)
 
+    @Update
+    fun update(category: Category)
+
     @Query("SELECT * FROM category")
-     fun getAllCategory(): Flow<List<Category>>
+    fun getAllCategory(): Flow<List<Category>>
 
     @Query("SELECT * FROM category WHERE category_id = :parentId")
     fun getCategoryFromParent(parentId: Int): List<Category>

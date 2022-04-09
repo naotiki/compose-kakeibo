@@ -33,8 +33,9 @@ enum class ItemDataSort(
     Price("値段順", "低" to "高", Comparator { o1, o2 ->
         o1.price.compareTo(o2.price)
     }),
+    //Sort by date. if date is equals,sort by id
     Date("日付順", "古" to "新", Comparator { o1, o2 ->
-        if (o1.date.equals(o2.date)) o1.id.compareTo(o2.id) else o1.date.compareTo(o2.date)
+        if (o1.date == o2.date) o1.id.compareTo(o2.id) else o1.date.compareTo(o2.date)
     });
 
     companion object {
@@ -45,12 +46,6 @@ enum class ItemDataSort(
     }
 }
 
-
-data class DateAndPriceProductItem(
-    val date: Date,
-    val price: Int,
-)
-
 @Dao
 interface ItemDataDao {
     @Query("SELECT * from item_data WHERE :minDate <= date AND :maxDate >= date")
@@ -58,6 +53,11 @@ interface ItemDataDao {
 
     @Query("SELECT * FROM item_data WHERE date = :date")
     fun getItemsFromDate(date: Date): List<ItemData>
+
+
+    //"limit 1" for Improve performance.
+    @Query("select parent_category_id from item_data where parent_category_id = :categoryId limit 1")
+    fun existHasCategory(categoryId: Int): Int?
 
     @Insert
     fun insertAll(vararg users: ItemData)
@@ -69,7 +69,7 @@ interface ItemDataDao {
     fun update(vararg item: ItemData)
 
     @RawQuery(observedEntities = [ItemData::class])
-     fun getItemDataViaQuery(query: SupportSQLiteQuery): Flow<List<ItemData>>
+    fun getItemDataViaQuery(query: SupportSQLiteQuery): Flow<List<ItemData>>
 }
 
 
